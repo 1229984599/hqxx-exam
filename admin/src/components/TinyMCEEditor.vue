@@ -732,19 +732,16 @@ const editorConfig = computed(() => ({
   plugins: [
     'advlist', 'autolink', 'lists', 'link', 'image', 'charmap',
     'anchor', 'searchreplace', 'visualblocks', 'code', 'fullscreen',
-    'insertdatetime', 'media', 'table', 'help', 'wordcount',
+    'insertdatetime', 'media', 'table', 'wordcount',
     'autosave', 'directionality', 'nonbreaking', 'pagebreak'
   ],
-  toolbar: 'responsivepreview contentstats | undo redo | blocks fontsize fontsizeplus fontsizeminus lineheight | bold italic underline strikethrough | alignleft aligncenter alignright alignjustify | outdent indent | numlist bullist | forecolor backcolor | link image table | quicksymbols | addpinyin removepinyin smartpinyin | inserttemplate | shortcuts code fullscreen help',
+  toolbar: 'responsivepreview contentstats | undo redo | blocks fontsize fontsizeplus fontsizeminus lineheight | bold italic underline strikethrough | alignleft aligncenter alignright alignjustify | outdent indent | numlist bullist | forecolor backcolor | link image table | quicksymbols | addpinyin removepinyin smartpinyin | inserttemplate | code | fullscreen',
   toolbar_mode: props.toolbarMode,
-  // 禁用快速工具栏，避免空白时弹出添加图标和表格的提示
-  quickbars_selection_toolbar: false,
-  quickbars_insert_toolbar: false,
 
   // 右键菜单
   contextmenu: 'undo redo | cut copy paste | selectall | removeformat | link unlink',
   // 字体大小配置 - 添加更多大字体选项，特别适合教学场景
-  fontsize_formats: '8px 10px 12px 14px 16px 18px 20px 24px 28px 32px 36px 42px 48px 54px 60px 72px 84px 96px 108px 120px 144px 168px 192px 216px 240px',
+  font_size_formats: '8px 10px 12px 14px 16px 18px 20px 24px 28px 32px 36px 42px 48px 54px 60px 72px 84px 96px 108px 120px 144px 168px 192px 216px 240px',
 
   // 移除表情插件配置，使用自定义符号功能
   /*
