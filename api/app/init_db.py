@@ -83,18 +83,18 @@ async def init_db():
 
         if chinese:
             categories_data = [
-                {"name": "拼音", "code": "pinyin", "subject_id": chinese.id, "sort_order": 1},
-                {"name": "识字", "code": "words", "subject_id": chinese.id, "sort_order": 2},
-                {"name": "阅读理解", "code": "reading", "subject_id": chinese.id, "sort_order": 3},
+                {"name": "拼音", "code": "pinyin", "subject": chinese, "sort_order": 1},
+                {"name": "识字", "code": "words", "subject": chinese, "sort_order": 2},
+                {"name": "阅读理解", "code": "reading", "subject": chinese, "sort_order": 3},
             ]
             for cat_data in categories_data:
                 await Category.create(**cat_data)
 
         if math:
             categories_data = [
-                {"name": "加减法", "code": "addition", "subject_id": math.id, "sort_order": 1},
-                {"name": "乘除法", "code": "multiplication", "subject_id": math.id, "sort_order": 2},
-                {"name": "应用题", "code": "word_problems", "subject_id": math.id, "sort_order": 3},
+                {"name": "加减法", "code": "addition", "subject": math, "sort_order": 1},
+                {"name": "乘除法", "code": "multiplication", "subject": math, "sort_order": 2},
+                {"name": "应用题", "code": "word_problems", "subject": math, "sort_order": 3},
             ]
             for cat_data in categories_data:
                 await Category.create(**cat_data)
@@ -134,10 +134,10 @@ async def init_db():
                         "content": "<p>请读出下面的拼音：<br><strong>ma  fa  la  da</strong></p>",
                         "answer": "ma读作妈，fa读作发，la读作拉，da读作大",
                         "difficulty": 1,
-                        "semester_id": semester.id,
-                        "grade_id": grade.id,
-                        "subject_id": chinese.id,
-                        "category_id": pinyin_cat.id,
+                        "semester": semester,
+                        "grade": grade,
+                        "subject": chinese,
+                        "category": pinyin_cat,
                         "is_published": True
                     }
                 ]
@@ -149,25 +149,21 @@ async def init_db():
                     {
                         "title": "10以内加法：5+3",
                         "content": "<p>计算下面的加法题：</p><h2>5 + 3 = ?</h2>",
-                        "answer": "8",
-                        "explanation": "5个苹果加上3个苹果，一共是8个苹果",
                         "difficulty": 1,
-                        "semester_id": semester.id,
-                        "grade_id": grade.id,
-                        "subject_id": math.id,
-                        "category_id": addition_cat.id,
+                        "semester": semester,
+                        "grade": grade,
+                        "subject": math,
+                        "category": addition_cat,
                         "is_published": True
                     },
                     {
                         "title": "10以内加法：7+2",
                         "content": "<p>计算下面的加法题：</p><h2>7 + 2 = ?</h2>",
-                        "answer": "9",
-                        "explanation": "7个玩具加上2个玩具，一共是9个玩具",
                         "difficulty": 1,
-                        "semester_id": semester.id,
-                        "grade_id": grade.id,
-                        "subject_id": math.id,
-                        "category_id": addition_cat.id,
+                        "semester": semester,
+                        "grade": grade,
+                        "subject": math,
+                        "category": addition_cat,
                         "is_published": True
                     }
                 ]
@@ -175,6 +171,126 @@ async def init_db():
                     await Question.create(**q_data)
 
         print("✅ 创建测试题目数据")
+
+    # 创建默认模板
+    from app.models.template import Template
+    template_exists = await Template.exists()
+    if not template_exists:
+        # 获取学科
+        chinese = await Subject.filter(code="chinese").first()
+        math = await Subject.filter(code="math").first()
+
+        templates_data = [
+            {
+                "name": "拼音练习",
+                "description": "带声调的拼音练习模板",
+                "content": """
+                <div style="text-align: center; margin: 20px 0; padding: 20px; border: 2px dashed #409eff; border-radius: 10px;">
+                  <h3 style="color: #409eff; margin-bottom: 20px;">📖 拼音练习</h3>
+                  <p style="margin-bottom: 15px; color: #606266;">请读出下面的拼音：</p>
+                  <div style="font-size: 36px; letter-spacing: 8px; margin: 30px 0; line-height: 1.8;">
+                    bā  bí  bǔ  bò
+                  </div>
+                  <div style="margin-top: 20px; font-size: 14px; color: #909399;">
+                    提示：注意声调的准确性
+                  </div>
+                </div>
+                """,
+                "category": "语文",
+                "icon": "🔤",
+                "subject": chinese,
+                "is_system": True,
+                "sort_order": 1
+            },
+            {
+                "name": "汉字练习",
+                "description": "大字号汉字显示模板",
+                "content": """
+                <div style="text-align: center; margin: 20px 0; padding: 20px; border: 2px dashed #f56c6c; border-radius: 10px;">
+                  <h3 style="color: #f56c6c; margin-bottom: 20px;">✍️ 汉字练习</h3>
+                  <p style="margin-bottom: 15px; color: #606266;">请读出下面的汉字：</p>
+                  <div style="font-size: 48px; letter-spacing: 20px; margin: 30px 0; line-height: 1.5;">
+                    大  小  多  少
+                  </div>
+                  <div style="margin-top: 20px; font-size: 14px; color: #909399;">
+                    提示：注意笔画顺序
+                  </div>
+                </div>
+                """,
+                "category": "语文",
+                "icon": "📝",
+                "subject": chinese,
+                "is_system": True,
+                "sort_order": 2
+            },
+            {
+                "name": "数学计算",
+                "description": "带答题区域的计算题",
+                "content": """
+                <div style="text-align: center; margin: 20px 0; padding: 20px; border: 2px dashed #e6a23c; border-radius: 10px;">
+                  <h3 style="color: #e6a23c; margin-bottom: 20px;">🔢 数学计算</h3>
+                  <p style="margin-bottom: 15px; color: #606266;">计算下面的题目：</p>
+                  <div style="font-size: 32px; margin: 30px 0; line-height: 2;">
+                    5 + 3 = <span style="border-bottom: 2px solid #333; padding: 0 20px; margin: 0 10px;"></span>
+                  </div>
+                  <div style="margin-top: 20px; font-size: 14px; color: #909399;">
+                    请在横线上写出答案
+                  </div>
+                </div>
+                """,
+                "category": "数学",
+                "icon": "🔢",
+                "subject": math,
+                "is_system": True,
+                "sort_order": 3
+            },
+            {
+                "name": "选择题",
+                "description": "标准ABCD选择题格式",
+                "content": """
+                <div style="margin: 20px 0; padding: 20px; border: 2px dashed #909399; border-radius: 10px;">
+                  <h3 style="color: #909399; margin-bottom: 15px;">☑️ 选择题</h3>
+                  <p style="margin-bottom: 15px; font-weight: bold;">题目：请选择正确答案</p>
+                  <div style="margin-left: 20px; line-height: 2;">
+                    <p>A. 选项一</p>
+                    <p>B. 选项二</p>
+                    <p>C. 选项三</p>
+                    <p>D. 选项四</p>
+                  </div>
+                  <div style="margin-top: 15px; font-size: 14px; color: #909399;">
+                    答案：<span style="border-bottom: 1px solid #333; padding: 0 10px;"></span>
+                  </div>
+                </div>
+                """,
+                "category": "通用",
+                "icon": "☑️",
+                "is_system": True,
+                "sort_order": 4
+            },
+            {
+                "name": "填空题",
+                "description": "带下划线的填空格式",
+                "content": """
+                <div style="margin: 20px 0; padding: 20px; border: 2px dashed #67c23a; border-radius: 10px;">
+                  <h3 style="color: #67c23a; margin-bottom: 15px;">✏️ 填空题</h3>
+                  <p style="line-height: 2.5;">
+                    请在横线上填入合适的词语：<br><br>
+                    春天来了，<span style="border-bottom: 2px solid #333; padding: 0 30px; margin: 0 5px;"></span>开花了，
+                    <span style="border-bottom: 2px solid #333; padding: 0 30px; margin: 0 5px;"></span>变绿了。
+                  </p>
+                </div>
+                """,
+                "category": "通用",
+                "icon": "✏️",
+                "is_system": True,
+                "sort_order": 5
+            }
+        ]
+
+        for template_data in templates_data:
+            await Template.create(**template_data)
+
+        print("✅ 创建默认模板数据")
 
     print("🎉 数据库初始化完成!")
 

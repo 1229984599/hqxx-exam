@@ -35,6 +35,10 @@ class Settings(BaseSettings):
     # 文件上传配置
     UPLOAD_DIR: str = "uploads"
     MAX_FILE_SIZE: int = 10485760  # 10MB
+
+    # 图床配置
+    IMAGE_CDN_URL: str = "https://img.ink/api/upload"
+    IMAGE_CDN_TOKEN: str = ""  # 从环境变量获取
     
     class Config:
         env_file = ".env"

@@ -6,6 +6,7 @@ class Question(BaseModel):
     """试题模型"""
     title = fields.CharField(max_length=200, description="题目标题")
     content = fields.TextField(description="题目内容(富文本)")
+    answer = fields.TextField(null=True, description="参考答案(富文本)")
 
     difficulty = fields.IntField(default=1, description="难度等级(1-5)")
     question_type = fields.CharField(max_length=20, default="single", description="题目类型")

@@ -1,18 +1,61 @@
 <template>
   <PageLayout
-    title="学期管理"
-    subtitle="管理学校的学期信息，设置学期状态和排序"
+      title="学期管理"
+      subtitle="管理学校的学期信息，设置学期状态和排序"
   >
     <template #actions>
       <el-button
-        type="primary"
-        @click="showAddDialog = true"
-        :icon="Plus"
-        size="large"
+          type="primary"
+          @click="showAddDialog = true"
+          :icon="Plus"
+          size="large"
       >
         添加学期
       </el-button>
     </template>
+
+    <!-- 筛选条件 -->
+    <div class="filter-section">
+      <el-form :model="filters" inline>
+        <el-form-item>
+          <el-button
+              type="primary"
+              @click="showAddDialog = true"
+              :icon="Plus"
+              size="default"
+          >
+            添加学期
+          </el-button>
+        </el-form-item>
+
+        <el-form-item label="状态">
+          <el-select v-model="filters.is_active" placeholder="请选择状态" clearable @change="loadSemesters"
+                     style="width: 120px">
+            <el-option label="启用" :value="true"/>
+            <el-option label="禁用" :value="false"/>
+          </el-select>
+        </el-form-item>
+
+        <el-form-item label="搜索">
+          <el-input
+              v-model="filters.search"
+              placeholder="搜索学期名称或代码"
+              clearable
+              style="width: 200px"
+              @keyup.enter="loadSemesters"
+          />
+        </el-form-item>
+
+        <el-form-item>
+          <el-button type="primary" @click="loadSemesters" :icon="Search">
+            搜索
+          </el-button>
+          <el-button @click="resetFilters" :icon="Refresh">
+            重置
+          </el-button>
+        </el-form-item>
+      </el-form>
+    </div>
 
     <!-- 数据表格 -->
     <el-table :data="semesters" v-loading="loading" class="modern-table">
@@ -20,8 +63,13 @@
         <template #default="{ row }">
           <div class="semester-name">
             <span class="name-text">{{ row.name }}</span>
-            <el-tag size="small" type="info" class="code-tag">{{ row.code }}</el-tag>
           </div>
+        </template>
+      </el-table-column>
+      <el-table-column prop="code" label="学期代码" width="120">
+        <template #default="{ row }">
+          <el-tag size="small" type="info" class="code-tag">{{ row.code }}</el-tag>
+
         </template>
       </el-table-column>
       <el-table-column prop="sort_order" label="排序" width="100" align="center">
@@ -44,60 +92,61 @@
       <el-table-column label="操作" width="140" fixed="right">
         <template #default="{ row }">
           <div class="action-buttons">
-            <el-button size="small" @click="editSemester(row)" :icon="Edit" />
+            <el-button size="small" @click="editSemester(row)" :icon="Edit"/>
             <el-button
-              size="small"
-              type="danger"
-              @click="deleteSemester(row)"
-              :icon="Delete"
+                size="small"
+                type="danger"
+                @click="deleteSemester(row)"
+                :icon="Delete"
             />
           </div>
         </template>
       </el-table-column>
     </el-table>
-    
+
     <!-- 添加/编辑对话框 -->
     <el-dialog
-      v-model="showAddDialog"
-      :title="editingId ? '编辑学期' : '添加学期'"
-      width="500px"
+        v-model="showAddDialog"
+        :title="editingId ? '编辑学期' : '添加学期'"
+        width="500px"
+        :before-close="handleDialogClose"
     >
       <el-form
-        ref="formRef"
-        :model="form"
-        :rules="rules"
-        label-width="100px"
+          ref="formRef"
+          :model="form"
+          :rules="rules"
+          label-width="100px"
       >
         <el-form-item label="学期名称" prop="name">
-          <el-input v-model="form.name" placeholder="请输入学期名称" />
+          <el-input v-model="form.name" placeholder="请输入学期名称"/>
         </el-form-item>
-        
+
         <el-form-item label="学期代码" prop="code">
-          <el-input v-model="form.code" placeholder="请输入学期代码" />
+          <el-input v-model="form.code" placeholder="请输入学期代码"/>
         </el-form-item>
-        
+
         <el-form-item label="排序" prop="sort_order">
-          <el-input-number v-model="form.sort_order" :min="0" />
+          <el-input-number v-model="form.sort_order" :min="0"/>
         </el-form-item>
-        
+
         <el-form-item label="状态" prop="is_active">
-          <el-switch v-model="form.is_active" />
+          <el-switch v-model="form.is_active"/>
         </el-form-item>
-        
+
         <el-form-item label="描述" prop="description">
           <el-input
-            v-model="form.description"
-            type="textarea"
-            :rows="3"
-            placeholder="请输入描述"
+              v-model="form.description"
+              type="textarea"
+              :rows="3"
+              placeholder="请输入描述"
           />
         </el-form-item>
       </el-form>
-      
+
       <template #footer>
-        <el-button @click="showAddDialog = false">取消</el-button>
+        <el-button @click="handleDialogClose">取消</el-button>
         <el-button type="primary" @click="saveSemester" :loading="saving">
-          确定
+          {{ editingId ? '更新' : '创建' }}
         </el-button>
       </template>
     </el-dialog>
@@ -105,9 +154,9 @@
 </template>
 
 <script setup>
-import { ref, reactive, onMounted } from 'vue'
-import { Plus, Edit, Delete } from '@element-plus/icons-vue'
-import { ElMessage, ElMessageBox } from 'element-plus'
+import {ref, reactive, onMounted, computed} from 'vue'
+import {Plus, Edit, Delete, Search, Refresh} from '@element-plus/icons-vue'
+import {ElMessage, ElMessageBox} from 'element-plus'
 import api from '../utils/api'
 import PageLayout from '../components/PageLayout.vue'
 
@@ -115,8 +164,34 @@ const loading = ref(false)
 const saving = ref(false)
 const showAddDialog = ref(false)
 const editingId = ref(null)
-const semesters = ref([])
+const allSemesters = ref([])
 const formRef = ref()
+
+const filters = reactive({
+  is_active: null,
+  search: ''
+})
+
+// 计算过滤后的学期列表
+const semesters = computed(() => {
+  let filtered = allSemesters.value
+
+  // 按状态筛选
+  if (filters.is_active !== null) {
+    filtered = filtered.filter(semester => semester.is_active === filters.is_active)
+  }
+
+  // 按搜索关键词筛选
+  if (filters.search) {
+    const searchLower = filters.search.toLowerCase()
+    filtered = filtered.filter(semester =>
+        semester.name.toLowerCase().includes(searchLower) ||
+        semester.code.toLowerCase().includes(searchLower)
+    )
+  }
+
+  return filtered
+})
 
 const form = reactive({
   name: '',
@@ -128,10 +203,10 @@ const form = reactive({
 
 const rules = {
   name: [
-    { required: true, message: '请输入学期名称', trigger: 'blur' }
+    {required: true, message: '请输入学期名称', trigger: 'blur'}
   ],
   code: [
-    { required: true, message: '请输入学期代码', trigger: 'blur' }
+    {required: true, message: '请输入学期代码', trigger: 'blur'}
   ]
 }
 
@@ -143,12 +218,19 @@ async function loadSemesters() {
   loading.value = true
   try {
     const response = await api.get('/semesters/')
-    semesters.value = response.data
+    allSemesters.value = response.data
   } catch (error) {
     ElMessage.error('加载学期列表失败')
   } finally {
     loading.value = false
   }
+}
+
+function resetFilters() {
+  Object.assign(filters, {
+    is_active: null,
+    search: ''
+  })
 }
 
 function editSemester(semester) {
@@ -159,11 +241,11 @@ function editSemester(semester) {
 
 async function saveSemester() {
   if (!formRef.value) return
-  
+
   try {
     await formRef.value.validate()
     saving.value = true
-    
+
     if (editingId.value) {
       await api.put(`/semesters/${editingId.value}`, form)
       ElMessage.success('更新成功')
@@ -171,7 +253,7 @@ async function saveSemester() {
       await api.post('/semesters/', form)
       ElMessage.success('添加成功')
     }
-    
+
     showAddDialog.value = false
     resetForm()
     loadSemesters()
@@ -189,7 +271,7 @@ async function deleteSemester(semester) {
       cancelButtonText: '取消',
       type: 'warning'
     })
-    
+
     await api.delete(`/semesters/${semester.id}`)
     ElMessage.success('删除成功')
     loadSemesters()
@@ -212,12 +294,26 @@ function resetForm() {
   formRef.value?.resetFields()
 }
 
+function handleDialogClose() {
+  showAddDialog.value = false
+  resetForm()
+}
+
 function formatDate(dateString) {
   return new Date(dateString).toLocaleString('zh-CN')
 }
 </script>
 
 <style scoped>
+.filter-section {
+  background: rgba(255, 255, 255, 0.8);
+  backdrop-filter: blur(10px);
+  border-radius: 12px;
+  padding: 20px;
+  margin-bottom: 24px;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+}
+
 .modern-table {
   border-radius: 12px;
   overflow: hidden;

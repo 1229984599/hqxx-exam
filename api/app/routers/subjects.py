@@ -67,8 +67,10 @@ async def update_subject(
         if existing:
             raise HTTPException(status_code=400, detail="Subject code already exists")
     
-    update_data = subject_data.dict(exclude_unset=True)
-    await subject.update_from_dict(update_data)
+    # 更新学科数据
+    update_data = subject_data.model_dump(exclude_unset=True)
+    for field, value in update_data.items():
+        setattr(subject, field, value)
     await subject.save()
     return subject
 

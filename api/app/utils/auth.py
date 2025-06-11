@@ -1,6 +1,6 @@
 from datetime import datetime, timedelta
-from typing import Optional
-from jose import JWTError, jwt
+from typing import Optional, Tuple
+from jose import JWTError, jwt, ExpiredSignatureError
 from passlib.context import CryptContext
 from app.config import settings
 
@@ -36,5 +36,54 @@ def verify_token(token: str) -> Optional[dict]:
     try:
         payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
         return payload
-    except JWTError:
+    except ExpiredSignatureError:
+        # Token已过期
         return None
+    except JWTError:
+        # Token格式错误或签名无效
+        return None
+
+
+def verify_token_with_detail(token: str) -> Tuple[Optional[dict], str]:
+    """验证令牌并返回详细错误信息"""
+    try:
+        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
+        return payload, ""
+    except ExpiredSignatureError:
+        return None, "访问令牌已过期，请重新登录"
+    except JWTError as e:
+        if "Invalid token" in str(e):
+            return None, "访问令牌格式错误"
+        elif "Invalid signature" in str(e):
+            return None, "访问令牌签名无效"
+        else:
+            return None, "访问令牌验证失败"
+    except Exception as e:
+        return None, f"令牌验证时发生未知错误：{str(e)}"
+
+
+def get_token_expiry_time(token: str) -> Optional[datetime]:
+    """获取token的过期时间"""
+    try:
+        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
+        exp_timestamp = payload.get("exp")
+        if exp_timestamp:
+            return datetime.fromtimestamp(exp_timestamp)
+        return None
+    except:
+        return None
+
+
+def is_token_expiring_soon(token: str, threshold_minutes: int = 5) -> bool:
+    """检查token是否即将过期（默认5分钟内）"""
+    try:
+        expiry_time = get_token_expiry_time(token)
+        if not expiry_time:
+            return True  # 无法获取过期时间，认为需要刷新
+
+        current_time = datetime.utcnow()
+        time_until_expiry = expiry_time - current_time
+
+        return time_until_expiry.total_seconds() <= (threshold_minutes * 60)
+    except:
+        return True  # 出错时认为需要刷新

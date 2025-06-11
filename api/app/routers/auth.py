@@ -3,7 +3,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordRequestForm
 from app.models.admin import Admin
 from app.schemas.auth import Token, AdminLogin, AdminCreate, AdminResponse
-from app.utils.auth import verify_password, get_password_hash, create_access_token
+from app.utils.auth import verify_password, get_password_hash, create_access_token, verify_token_with_detail
 from app.dependencies.auth import get_current_active_admin, get_current_superuser
 from app.config import settings
 
@@ -13,40 +13,125 @@ router = APIRouter(prefix="/auth", tags=["认证"])
 @router.post("/login", response_model=Token, summary="管理员登录")
 async def login(form_data: OAuth2PasswordRequestForm = Depends()):
     """管理员登录"""
-    admin = await Admin.filter(username=form_data.username, is_active=True).first()
-    
-    if not admin or not verify_password(form_data.password, admin.hashed_password):
+    # 检查用户名是否为空
+    if not form_data.username or not form_data.username.strip():
         raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Incorrect username or password",
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="用户名不能为空",
             headers={"WWW-Authenticate": "Bearer"},
         )
-    
+
+    # 检查密码是否为空
+    if not form_data.password:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="密码不能为空",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    # 查找用户（包括非激活用户）
+    admin = await Admin.filter(username=form_data.username.strip()).first()
+
+    # 用户不存在
+    if not admin:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="用户名不存在，请检查用户名是否正确",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    # 用户被禁用
+    if not admin.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="账户已被禁用，请联系系统管理员",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    # 密码错误
+    if not verify_password(form_data.password, admin.hashed_password):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="密码错误，请检查密码是否正确",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    # 登录成功，生成token
     access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
     access_token = create_access_token(
         data={"sub": admin.username}, expires_delta=access_token_expires
     )
-    
+
     return {"access_token": access_token, "token_type": "bearer"}
 
 
 @router.post("/login/json", response_model=Token, summary="JSON格式登录")
 async def login_json(login_data: AdminLogin):
     """JSON格式的管理员登录"""
-    admin = await Admin.filter(username=login_data.username, is_active=True).first()
-    
-    if not admin or not verify_password(login_data.password, admin.hashed_password):
+    # 检查用户名是否为空
+    if not login_data.username or not login_data.username.strip():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="用户名不能为空"
+        )
+
+    # 检查密码是否为空
+    if not login_data.password:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="密码不能为空"
+        )
+
+    # 查找用户（包括非激活用户）
+    admin = await Admin.filter(username=login_data.username.strip()).first()
+
+    # 用户不存在
+    if not admin:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Incorrect username or password",
+            detail="用户名不存在，请检查用户名是否正确"
         )
-    
+
+    # 用户被禁用
+    if not admin.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="账户已被禁用，请联系系统管理员"
+        )
+
+    # 密码错误
+    if not verify_password(login_data.password, admin.hashed_password):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="密码错误，请检查密码是否正确"
+        )
+
+    # 登录成功，生成token
     access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
     access_token = create_access_token(
         data={"sub": admin.username}, expires_delta=access_token_expires
     )
-    
+
     return {"access_token": access_token, "token_type": "bearer"}
+
+
+@router.post("/refresh", response_model=Token, summary="刷新访问令牌")
+async def refresh_token(current_admin: Admin = Depends(get_current_active_admin)):
+    """刷新访问令牌"""
+    try:
+        # 生成新的访问令牌
+        access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
+        access_token = create_access_token(
+            data={"sub": current_admin.username},
+            expires_delta=access_token_expires
+        )
+
+        return {"access_token": access_token, "token_type": "bearer"}
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"刷新令牌失败：{str(e)}"
+        )
 
 
 @router.get("/me", response_model=AdminResponse, summary="获取当前用户信息")
@@ -61,30 +146,55 @@ async def register_admin(
     current_admin: Admin = Depends(get_current_superuser)
 ):
     """注册新管理员（仅超级管理员可操作）"""
+    # 验证输入数据
+    if not admin_data.username or not admin_data.username.strip():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="用户名不能为空"
+        )
+
+    if not admin_data.password or len(admin_data.password) < 6:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="密码不能为空且长度不能少于6位"
+        )
+
+    if not admin_data.email or not admin_data.email.strip():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="邮箱不能为空"
+        )
+
     # 检查用户名是否已存在
-    existing_admin = await Admin.filter(username=admin_data.username).first()
+    existing_admin = await Admin.filter(username=admin_data.username.strip()).first()
     if existing_admin:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Username already registered"
+            detail=f"用户名 '{admin_data.username}' 已被注册，请选择其他用户名"
         )
-    
+
     # 检查邮箱是否已存在
-    existing_email = await Admin.filter(email=admin_data.email).first()
+    existing_email = await Admin.filter(email=admin_data.email.strip().lower()).first()
     if existing_email:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Email already registered"
+            detail=f"邮箱 '{admin_data.email}' 已被注册，请使用其他邮箱"
         )
-    
-    # 创建新管理员
-    hashed_password = get_password_hash(admin_data.password)
-    admin = await Admin.create(
-        username=admin_data.username,
-        email=admin_data.email,
-        hashed_password=hashed_password,
-        full_name=admin_data.full_name,
-        is_superuser=admin_data.is_superuser
-    )
-    
-    return admin
+
+    try:
+        # 创建新管理员
+        hashed_password = get_password_hash(admin_data.password)
+        admin = await Admin.create(
+            username=admin_data.username.strip(),
+            email=admin_data.email.strip().lower(),
+            hashed_password=hashed_password,
+            full_name=admin_data.full_name.strip() if admin_data.full_name else None,
+            is_superuser=admin_data.is_superuser
+        )
+
+        return admin
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"创建管理员账户失败：{str(e)}"
+        )

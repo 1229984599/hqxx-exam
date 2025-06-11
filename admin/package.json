@@ -9,12 +9,15 @@
   },
   "dependencies": {
     "@element-plus/icons-vue": "^2.3.0",
+    "@tinymce/tinymce-vue": "^6.2.0",
     "@wangeditor/editor": "^5.1.23",
     "@wangeditor/editor-for-vue": "^5.1.12",
     "axios": "^1.6.0",
     "element-plus": "^2.4.0",
-    "pinia": "^2.1.7",
+    "pinia": "^3.0.3",
+    "pinia-plugin-persistedstate": "^4.3.0",
     "pinyin-pro": "^3.26.0",
+    "tinymce": "^7.9.1",
     "vue": "^3.4.0",
     "vue-router": "^4.2.5"
   },

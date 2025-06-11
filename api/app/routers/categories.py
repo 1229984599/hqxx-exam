@@ -20,7 +20,7 @@ async def get_categories(
     limit: int = Query(100, ge=1, le=100, description="限制数量")
 ):
     """获取分类列表"""
-    query = Category.all().prefetch_related("subject", "parent")
+    query = Category.all()
 
     if subject_id is not None:
         query = query.filter(subject_id=subject_id)
@@ -33,33 +33,22 @@ async def get_categories(
 
     categories = await query.offset(skip).limit(limit).order_by("sort_order", "id")
 
-    # 手动序列化避免循环引用
+    # 手动构建响应数据
     result = []
     for category in categories:
-        category_dict = {
+        result.append({
             "id": category.id,
             "name": category.name,
             "code": category.code,
             "subject_id": category.subject_id,
-            "parent_id": category.parent_id,
+            "parent_id": category.parent_id if category.parent_id else None,
             "level": category.level,
             "is_active": category.is_active,
             "sort_order": category.sort_order,
             "description": category.description,
             "created_at": category.created_at,
-            "updated_at": category.updated_at,
-            "subject": {
-                "id": category.subject.id,
-                "name": category.subject.name,
-                "code": category.subject.code
-            } if category.subject else None,
-            "parent": {
-                "id": category.parent.id,
-                "name": category.parent.name,
-                "code": category.parent.code
-            } if category.parent else None
-        }
-        result.append(category_dict)
+            "updated_at": category.updated_at
+        })
 
     return result
 
@@ -104,7 +93,7 @@ async def create_category(
     return await Category.filter(id=category.id).prefetch_related("subject", "parent").first()
 
 
-@router.put("/{category_id}", response_model=CategoryResponse, summary="更新分类")
+@router.put("/{category_id}", summary="更新分类")
 async def update_category(
     category_id: int,
     category_data: CategoryUpdate,
@@ -128,16 +117,21 @@ async def update_category(
             raise HTTPException(status_code=400, detail="Parent category not found")
     
     # 检查代码是否与其他分类冲突
-    if category_data.code and category_data.subject_id:
+    if category_data.code:
+        # 获取要检查的学科ID：优先使用更新数据中的学科ID，否则使用当前分类的学科ID
+        subject_id_to_check = category_data.subject_id if category_data.subject_id is not None else category.subject_id
+
         existing = await Category.filter(
-            subject_id=category_data.subject_id,
+            subject_id=subject_id_to_check,
             code=category_data.code
         ).exclude(id=category_id).first()
         if existing:
             raise HTTPException(status_code=400, detail="Category code already exists in this subject")
     
-    update_data = category_data.dict(exclude_unset=True)
-    await category.update_from_dict(update_data)
+    # 更新分类数据
+    update_data = category_data.model_dump(exclude_unset=True)
+    for field, value in update_data.items():
+        setattr(category, field, value)
     await category.save()
     
     return await Category.filter(id=category_id).prefetch_related("subject", "parent").first()

@@ -13,9 +13,9 @@
       </div>
 
       <nav class="nav-menu">
-        <div class="menu-item" :class="{ active: $route.name === 'dashboard' }" @click="$router.push('/')">
+        <div style="margin-bottom: 8px" class="menu-item" :class="{ active: $route.name === 'dashboard' }" @click="$router.push('/')">
           <el-icon class="menu-icon"><Odometer /></el-icon>
-          <span v-show="!isCollapse" class="menu-text">仪表板</span>
+          <span v-show="!isCollapse" class="menu-text" >仪表板</span>
         </div>
 
         <div class="menu-group">
@@ -45,9 +45,23 @@
         <div class="menu-group">
           <div v-show="!isCollapse" class="menu-group-title">内容管理</div>
 
-          <div class="menu-item" :class="{ active: $route.name === 'questions' }" @click="$router.push('/questions')">
+          <div class="menu-item" :class="{ active: ['questions', 'question-add', 'question-edit'].includes($route.name) }" @click="$router.push('/questions')">
             <el-icon class="menu-icon"><Document /></el-icon>
             <span v-show="!isCollapse" class="menu-text">试题管理</span>
+          </div>
+
+          <div class="menu-item" :class="{ active: ['templates', 'template-add', 'template-edit'].includes($route.name) }" @click="$router.push('/templates')">
+            <el-icon class="menu-icon"><DocumentCopy /></el-icon>
+            <span v-show="!isCollapse" class="menu-text">模板管理</span>
+          </div>
+        </div>
+
+        <div class="menu-group">
+          <div v-show="!isCollapse" class="menu-group-title">开发工具</div>
+
+          <div class="menu-item" :class="{ active: $route.name === 'tinymce-test' }" @click="$router.push('/tinymce-test')">
+            <el-icon class="menu-icon"><Edit /></el-icon>
+            <span v-show="!isCollapse" class="menu-text">编辑器测试</span>
           </div>
         </div>
       </nav>
@@ -103,17 +117,21 @@
         <RouterView />
       </main>
     </div>
+
+    <!-- Token状态显示 -->
+    <TokenStatus :show="appStore.showTokenStatus" />
   </div>
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { RouterView } from 'vue-router'
 import {
   Odometer,
   Setting,
   Document,
+  DocumentCopy,
   Expand,
   Fold,
   ArrowDown,
@@ -121,19 +139,22 @@ import {
   Calendar,
   School,
   Reading,
-  Collection
+  Collection,
+  Edit
 } from '@element-plus/icons-vue'
-import { useAuthStore } from '../stores/auth'
+import { useAuthStore, useAppStore } from '../stores'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import TokenStatus from '../components/TokenStatus.vue'
 
 const router = useRouter()
 const route = useRoute()
 const authStore = useAuthStore()
+const appStore = useAppStore()
 
-const isCollapse = ref(false)
+const isCollapse = computed(() => appStore.isCollapsed)
 
 function toggleCollapse() {
-  isCollapse.value = !isCollapse.value
+  appStore.toggleSidebar()
 }
 
 function getBreadcrumbText() {
@@ -143,7 +164,13 @@ function getBreadcrumbText() {
     'grades': '年级管理',
     'subjects': '学科管理',
     'categories': '分类管理',
-    'questions': '试题管理'
+    'questions': '试题管理',
+    'question-add': '试题管理 / 添加试题',
+    'question-edit': '试题管理 / 编辑试题',
+    'templates': '模板管理',
+    'template-add': '模板管理 / 添加模板',
+    'template-edit': '模板管理 / 编辑模板',
+    'tinymce-test': '编辑器测试'
   }
   return routeNames[route.name] || '管理后台'
 }
@@ -454,21 +481,44 @@ async function handleCommand(command) {
   }
 }
 
-/* 滚动条样式 */
+/* 滚动条样式优化 - 与主题融合 */
 .main-content::-webkit-scrollbar {
-  width: 6px;
+  width: 8px;
 }
 
 .main-content::-webkit-scrollbar-track {
-  background: rgba(255, 255, 255, 0.1);
+  background: rgba(102, 126, 234, 0.05);
+  border-radius: 4px;
 }
 
 .main-content::-webkit-scrollbar-thumb {
-  background: rgba(102, 126, 234, 0.3);
-  border-radius: 3px;
+  background: linear-gradient(135deg, rgba(102, 126, 234, 0.3) 0%, rgba(118, 75, 162, 0.3) 100%);
+  border-radius: 4px;
+  transition: all 0.3s ease;
 }
 
 .main-content::-webkit-scrollbar-thumb:hover {
-  background: rgba(102, 126, 234, 0.5);
+  background: linear-gradient(135deg, rgba(102, 126, 234, 0.6) 0%, rgba(118, 75, 162, 0.6) 100%);
+  transform: scale(1.1);
+}
+
+/* 侧边栏滚动条样式 */
+.nav-menu::-webkit-scrollbar {
+  width: 6px;
+}
+
+.nav-menu::-webkit-scrollbar-track {
+  background: rgba(102, 126, 234, 0.05);
+  border-radius: 3px;
+}
+
+.nav-menu::-webkit-scrollbar-thumb {
+  background: linear-gradient(135deg, rgba(102, 126, 234, 0.2) 0%, rgba(118, 75, 162, 0.2) 100%);
+  border-radius: 3px;
+  transition: all 0.3s ease;
+}
+
+.nav-menu::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(135deg, rgba(102, 126, 234, 0.4) 0%, rgba(118, 75, 162, 0.4) 100%);
 }
 </style>

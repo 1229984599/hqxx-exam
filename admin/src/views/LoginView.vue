@@ -59,7 +59,7 @@
 import { ref, reactive } from 'vue'
 import { useRouter } from 'vue-router'
 import { User, Lock } from '@element-plus/icons-vue'
-import { useAuthStore } from '../stores/auth'
+import { useAuthStore } from '../stores'
 import { ElMessage } from 'element-plus'
 
 const router = useRouter()
@@ -85,18 +85,34 @@ const loginRules = {
 
 async function handleLogin() {
   if (!loginFormRef.value) return
-  
+
   try {
     await loginFormRef.value.validate()
     loading.value = true
-    
+
     await authStore.login(loginForm)
-    
+
     ElMessage.success('登录成功')
     router.push('/')
   } catch (error) {
-    if (error.response?.status === 401) {
-      ElMessage.error('用户名或密码错误')
+    console.error('登录错误:', error)
+
+    // 处理不同类型的错误
+    if (error.response?.data?.detail) {
+      // 后端返回的具体错误信息
+      ElMessage.error(error.response.data.detail)
+    } else if (error.response?.status === 400) {
+      ElMessage.error('请求参数错误，请检查输入信息')
+    } else if (error.response?.status === 401) {
+      ElMessage.error('认证失败，请检查用户名和密码')
+    } else if (error.response?.status === 403) {
+      ElMessage.error('账户被禁用，请联系管理员')
+    } else if (error.response?.status === 500) {
+      ElMessage.error('服务器内部错误，请稍后重试')
+    } else if (error.code === 'NETWORK_ERROR' || error.message?.includes('Network Error')) {
+      ElMessage.error('网络连接失败，请检查网络连接')
+    } else if (error.code === 'ECONNREFUSED') {
+      ElMessage.error('无法连接到服务器，请联系管理员')
     } else {
       ElMessage.error('登录失败，请重试')
     }

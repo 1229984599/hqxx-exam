@@ -1,14 +1,14 @@
 <template>
   <PageLayout
-    title="题目分类管理"
-    subtitle="管理考试系统中的题目分类，支持多级分类结构"
+      title="题目分类管理"
+      subtitle="管理考试系统中的题目分类，支持多级分类结构"
   >
     <template #actions>
       <el-button
-        type="primary"
-        :icon="Plus"
-        @click="showAddDialog = true"
-        size="large"
+          type="primary"
+          :icon="Plus"
+          @click="showAddDialog = true"
+          size="large"
       >
         添加分类
       </el-button>
@@ -17,22 +17,47 @@
     <!-- 筛选区域 -->
     <div class="filter-section">
       <el-form :model="filters" inline>
+        <el-form-item>
+          <el-button
+              type="primary"
+              @click="showAddDialog = true"
+              :icon="Plus"
+              size="default"
+          >
+            添加分类
+          </el-button>
+        </el-form-item>
+
         <el-form-item label="所属学科">
-          <el-select v-model="filters.subject_id" placeholder="请选择学科" clearable @change="loadCategories" style="width: 150px">
+          <el-select v-model="filters.subject_id" placeholder="请选择学科" clearable @change="loadCategories"
+                     style="width: 150px">
             <el-option
-              v-for="subject in subjects"
-              :key="subject.id"
-              :label="subject.name"
-              :value="subject.id"
+                v-for="subject in subjects"
+                :key="subject.id"
+                :label="subject.name"
+                :value="subject.id"
             />
           </el-select>
         </el-form-item>
+
         <el-form-item label="状态">
-          <el-select v-model="filters.is_active" placeholder="请选择状态" clearable @change="loadCategories" style="width: 120px">
-            <el-option label="启用" :value="true" />
-            <el-option label="禁用" :value="false" />
+          <el-select v-model="filters.is_active" placeholder="请选择状态" clearable @change="loadCategories"
+                     style="width: 120px">
+            <el-option label="启用" :value="true"/>
+            <el-option label="禁用" :value="false"/>
           </el-select>
         </el-form-item>
+
+        <el-form-item label="搜索">
+          <el-input
+              v-model="filters.search"
+              placeholder="搜索分类名称或代码"
+              clearable
+              style="width: 200px"
+              @keyup.enter="loadCategories"
+          />
+        </el-form-item>
+
         <el-form-item>
           <el-button type="primary" @click="loadCategories" :icon="Search">
             搜索
@@ -49,12 +74,18 @@
       <el-table-column prop="name" label="分类名称" min-width="150">
         <template #default="{ row }">
           <div class="category-name">
-            <el-icon v-if="row.level > 1" class="level-icon"><Right /></el-icon>
+            <el-icon v-if="row.level > 1" class="level-icon">
+              <Right/>
+            </el-icon>
             <span>{{ row.name }}</span>
           </div>
         </template>
       </el-table-column>
-      <el-table-column prop="code" label="分类代码" width="120" />
+      <el-table-column prop="code" label="分类代码" width="160">
+        <template #default="{ row }">
+          <el-tag size="small" type="info" class="code-tag">{{ row.code }}</el-tag>
+        </template>
+      </el-table-column>
       <el-table-column prop="subject.name" label="所属学科" width="120">
         <template #default="{ row }">
           <el-tag v-if="row.subject" type="info" size="small">
@@ -62,14 +93,18 @@
           </el-tag>
         </template>
       </el-table-column>
-      <el-table-column prop="level" label="分类级别" width="100">
+      <el-table-column prop="level" label="分类级别" width="130">
         <template #default="{ row }">
           <el-tag :type="getLevelType(row.level)" size="small">
             第{{ row.level }}级
           </el-tag>
         </template>
       </el-table-column>
-      <el-table-column prop="sort_order" label="排序" width="80" />
+      <el-table-column prop="sort_order" label="排序" width="80">
+        <template #default="{ row }">
+          <el-tag size="small" type="primary">{{ row.sort_order }}</el-tag>
+        </template>
+      </el-table-column>
       <el-table-column prop="is_active" label="状态" width="100">
         <template #default="{ row }">
           <el-tag :type="row.is_active ? 'success' : 'danger'" size="small">
@@ -81,15 +116,15 @@
         <template #default="{ row }">
           <div class="action-buttons">
             <el-button
-              size="small"
-              :icon="Edit"
-              @click="editCategory(row)"
+                size="small"
+                :icon="Edit"
+                @click="editCategory(row)"
             />
             <el-button
-              size="small"
-              type="danger"
-              :icon="Delete"
-              @click="deleteCategory(row)"
+                size="small"
+                type="danger"
+                :icon="Delete"
+                @click="deleteCategory(row)"
             />
           </div>
         </template>
@@ -98,32 +133,32 @@
 
     <!-- 添加/编辑对话框 -->
     <el-dialog
-      v-model="showAddDialog"
-      :title="editingId ? '编辑分类' : '添加分类'"
-      width="600px"
-      :before-close="handleDialogClose"
+        v-model="showAddDialog"
+        :title="editingId ? '编辑分类' : '添加分类'"
+        width="600px"
+        :before-close="handleDialogClose"
     >
       <el-form
-        ref="formRef"
-        :model="form"
-        :rules="rules"
-        label-width="100px"
+          ref="formRef"
+          :model="form"
+          :rules="rules"
+          label-width="100px"
       >
         <el-form-item label="分类名称" prop="name">
-          <el-input v-model="form.name" placeholder="请输入分类名称" />
+          <el-input v-model="form.name" placeholder="请输入分类名称"/>
         </el-form-item>
 
         <el-form-item label="分类代码" prop="code">
-          <el-input v-model="form.code" placeholder="请输入分类代码" />
+          <el-input v-model="form.code" placeholder="请输入分类代码"/>
         </el-form-item>
 
         <el-form-item label="所属学科" prop="subject_id">
           <el-select v-model="form.subject_id" placeholder="请选择学科">
             <el-option
-              v-for="subject in subjects"
-              :key="subject.id"
-              :label="subject.name"
-              :value="subject.id"
+                v-for="subject in subjects"
+                :key="subject.id"
+                :label="subject.name"
+                :value="subject.id"
             />
           </el-select>
         </el-form-item>
@@ -131,28 +166,28 @@
         <el-form-item label="父分类">
           <el-select v-model="form.parent_id" placeholder="请选择父分类（可选）" clearable>
             <el-option
-              v-for="category in parentCategories"
-              :key="category.id"
-              :label="category.name"
-              :value="category.id"
+                v-for="category in parentCategories"
+                :key="category.id"
+                :label="category.name"
+                :value="category.id"
             />
           </el-select>
         </el-form-item>
 
         <el-form-item label="排序">
-          <el-input-number v-model="form.sort_order" :min="0" :max="999" />
+          <el-input-number v-model="form.sort_order" :min="0" :max="999"/>
         </el-form-item>
 
         <el-form-item label="状态">
-          <el-switch v-model="form.is_active" />
+          <el-switch v-model="form.is_active"/>
         </el-form-item>
 
         <el-form-item label="描述">
           <el-input
-            v-model="form.description"
-            type="textarea"
-            :rows="3"
-            placeholder="请输入分类描述（可选）"
+              v-model="form.description"
+              type="textarea"
+              :rows="3"
+              placeholder="请输入分类描述（可选）"
           />
         </el-form-item>
       </el-form>
@@ -168,9 +203,9 @@
 </template>
 
 <script setup>
-import { ref, reactive, computed, onMounted } from 'vue'
-import { Plus, Edit, Delete, Search, Refresh, Right } from '@element-plus/icons-vue'
-import { ElMessage, ElMessageBox } from 'element-plus'
+import {ref, reactive, computed, onMounted} from 'vue'
+import {Plus, Edit, Delete, Search, Refresh, Right} from '@element-plus/icons-vue'
+import {ElMessage, ElMessageBox} from 'element-plus'
 import api from '../utils/api'
 import PageLayout from '../components/PageLayout.vue'
 
@@ -185,7 +220,8 @@ const subjects = ref([])
 
 const filters = reactive({
   subject_id: null,
-  is_active: null
+  is_active: null,
+  search: ''
 })
 
 const form = reactive({
@@ -201,22 +237,22 @@ const form = reactive({
 
 const rules = {
   name: [
-    { required: true, message: '请输入分类名称', trigger: 'blur' }
+    {required: true, message: '请输入分类名称', trigger: 'blur'}
   ],
   code: [
-    { required: true, message: '请输入分类代码', trigger: 'blur' }
+    {required: true, message: '请输入分类代码', trigger: 'blur'}
   ],
   subject_id: [
-    { required: true, message: '请选择所属学科', trigger: 'change' }
+    {required: true, message: '请选择所属学科', trigger: 'change'}
   ]
 }
 
 const parentCategories = computed(() => {
   if (!form.subject_id) return []
   return categories.value.filter(cat =>
-    cat.subject_id === form.subject_id &&
-    cat.id !== editingId.value &&
-    cat.level < 3 // 最多支持3级分类
+      cat.subject_id === form.subject_id &&
+      cat.id !== editingId.value &&
+      cat.level < 3 // 最多支持3级分类
   )
 })
 
@@ -241,8 +277,19 @@ async function loadCategories() {
     if (filters.subject_id) params.subject_id = filters.subject_id
     if (filters.is_active !== null) params.is_active = filters.is_active
 
-    const response = await api.get('/categories/', { params })
-    categories.value = response.data
+    const response = await api.get('/categories/', {params})
+    let filteredCategories = response.data
+
+    // 前端搜索过滤
+    if (filters.search) {
+      const searchLower = filters.search.toLowerCase()
+      filteredCategories = filteredCategories.filter(category =>
+          category.name.toLowerCase().includes(searchLower) ||
+          category.code.toLowerCase().includes(searchLower)
+      )
+    }
+
+    categories.value = filteredCategories
   } catch (error) {
     ElMessage.error('加载分类失败')
   } finally {
@@ -319,7 +366,8 @@ async function deleteCategory(category) {
 function resetFilters() {
   Object.assign(filters, {
     subject_id: null,
-    is_active: null
+    is_active: null,
+    search: ''
   })
   loadCategories()
 }
@@ -345,7 +393,7 @@ function handleDialogClose() {
 }
 
 function getLevelType(level) {
-  const types = { 1: 'primary', 2: 'success', 3: 'warning' }
+  const types = {1: 'primary', 2: 'success', 3: 'warning'}
   return types[level] || 'info'
 }
 </script>

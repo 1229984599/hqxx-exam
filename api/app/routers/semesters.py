@@ -67,8 +67,10 @@ async def update_semester(
         if existing:
             raise HTTPException(status_code=400, detail="Semester code already exists")
     
+    # 更新学期数据
     update_data = semester_data.dict(exclude_unset=True)
-    await semester.update_from_dict(update_data)
+    for field, value in update_data.items():
+        setattr(semester, field, value)
     await semester.save()
     return semester
 

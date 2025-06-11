@@ -4,6 +4,7 @@ from .grade import Grade
 from .subject import Subject
 from .category import Category
 from .question import Question
+from .template import Template
 
 __all__ = [
     "Admin",

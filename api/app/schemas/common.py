@@ -154,6 +154,7 @@ class CategoryResponse(BaseResponse):
 class QuestionBase(BaseModel):
     title: str
     content: str
+    answer: Optional[str] = None
     difficulty: int = 1
     question_type: str = "single"
     semester_id: int
@@ -174,6 +175,7 @@ class QuestionCreate(QuestionBase):
 class QuestionUpdate(BaseModel):
     title: Optional[str] = None
     content: Optional[str] = None
+    answer: Optional[str] = None
     difficulty: Optional[int] = None
     question_type: Optional[str] = None
     semester_id: Optional[int] = None
@@ -190,6 +192,7 @@ class QuestionUpdate(BaseModel):
 class QuestionResponse(BaseResponse):
     title: str
     content: str
+    answer: Optional[str] = None
     difficulty: int = 1
     question_type: str = "single"
     semester_id: int
@@ -206,6 +209,89 @@ class QuestionResponse(BaseResponse):
     grade: Optional[GradeResponse] = None
     subject: Optional[SubjectResponse] = None
     category: Optional[CategoryResponse] = None
+
+
+class TemplateBase(BaseModel):
+    name: str
+    description: Optional[str] = None
+    content: str
+    category: str
+    icon: Optional[str] = None
+    subject_id: Optional[int] = None
+    is_active: bool = True
+    is_system: bool = False
+    sort_order: int = 0
+
+
+class TemplateCreate(TemplateBase):
+    pass
+
+
+class TemplateUpdate(BaseModel):
+    name: Optional[str] = None
+    description: Optional[str] = None
+    content: Optional[str] = None
+    category: Optional[str] = None
+    icon: Optional[str] = None
+    subject_id: Optional[int] = None
+    is_active: Optional[bool] = None
+    is_system: Optional[bool] = None
+    sort_order: Optional[int] = None
+
+
+class TemplateResponse(BaseResponse):
+    name: str
+    description: Optional[str] = None
+    content: str
+    category: str
+    icon: Optional[str] = None
+    subject_id: Optional[int] = None
+    is_active: bool = True
+    is_system: bool = False
+    sort_order: int = 0
+    usage_count: int = 0
+    subject: Optional[SubjectResponse] = None
+
+
+# 模板相关Schema
+class TemplateBase(BaseModel):
+    name: str
+    description: Optional[str] = None
+    content: str
+    category: str
+    icon: Optional[str] = None
+    subject_id: Optional[int] = None
+    is_active: bool = True
+    sort_order: int = 0
+
+
+class TemplateCreate(TemplateBase):
+    pass
+
+
+class TemplateUpdate(BaseModel):
+    name: Optional[str] = None
+    description: Optional[str] = None
+    content: Optional[str] = None
+    category: Optional[str] = None
+    icon: Optional[str] = None
+    subject_id: Optional[int] = None
+    is_active: Optional[bool] = None
+    sort_order: Optional[int] = None
+
+
+class TemplateResponse(BaseResponse):
+    name: str
+    description: Optional[str] = None
+    content: str
+    category: str
+    icon: Optional[str] = None
+    subject_id: Optional[int] = None
+    is_active: bool = True
+    is_system: bool = False
+    sort_order: int = 0
+    usage_count: int = 0
+    subject: Optional[SubjectResponse] = None
 
 
 # 解决循环引用

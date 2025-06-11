@@ -21,7 +21,14 @@ export default defineConfig({
       '/api': {
         target: 'http://127.0.0.1:8000',
         changeOrigin: true,
-        secure: false
+        secure: false,
+        followRedirects: false,
+        configure: (proxy, options) => {
+          proxy.on('proxyReq', (proxyReq, req, res) => {
+            // 确保保持原始请求方法
+            proxyReq.method = req.method
+          })
+        }
       }
     }
   }

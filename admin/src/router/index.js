@@ -44,6 +44,36 @@ const router = createRouter({
           path: 'questions',
           name: 'questions',
           component: () => import('../views/QuestionView.vue')
+        },
+        {
+          path: 'questions/add',
+          name: 'question-add',
+          component: () => import('../views/QuestionFormView.vue')
+        },
+        {
+          path: 'questions/edit/:id',
+          name: 'question-edit',
+          component: () => import('../views/QuestionFormView.vue')
+        },
+        {
+          path: 'templates',
+          name: 'templates',
+          component: () => import('../views/TemplateListView.vue')
+        },
+        {
+          path: 'templates/add',
+          name: 'template-add',
+          component: () => import('../views/TemplateFormView.vue')
+        },
+        {
+          path: 'templates/edit/:id',
+          name: 'template-edit',
+          component: () => import('../views/TemplateFormView.vue')
+        },
+        {
+          path: 'tinymce-test',
+          name: 'tinymce-test',
+          component: () => import('../views/TinyMCETestView.vue')
         }
       ]
     }

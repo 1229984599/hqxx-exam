@@ -67,8 +67,10 @@ async def update_grade(
         if existing:
             raise HTTPException(status_code=400, detail="Grade code already exists")
     
+    # 更新年级数据
     update_data = grade_data.dict(exclude_unset=True)
-    await grade.update_from_dict(update_data)
+    for field, value in update_data.items():
+        setattr(grade, field, value)
     await grade.save()
     return grade
 

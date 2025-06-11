@@ -1,15 +1,5 @@
 <template>
   <div class="page-layout">
-    <div class="page-header">
-      <div class="header-left">
-        <h1 class="page-title">{{ title }}</h1>
-        <p v-if="subtitle" class="page-subtitle">{{ subtitle }}</p>
-      </div>
-      <div class="header-right">
-        <slot name="actions"></slot>
-      </div>
-    </div>
-    
     <div class="page-content">
       <slot></slot>
     </div>

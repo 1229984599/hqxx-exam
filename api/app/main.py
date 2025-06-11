@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from tortoise.contrib.fastapi import register_tortoise
 from app.config import settings, TORTOISE_ORM
-from app.routers import auth, semesters, grades, subjects, categories, questions
+from app.routers import auth, semesters, grades, subjects, categories, questions, templates, upload
 
 # 创建FastAPI应用
 app = FastAPI(
@@ -29,6 +29,8 @@ app.include_router(grades.router, prefix=settings.API_V1_STR)
 app.include_router(subjects.router, prefix=settings.API_V1_STR)
 app.include_router(categories.router, prefix=settings.API_V1_STR)
 app.include_router(questions.router, prefix=settings.API_V1_STR)
+app.include_router(templates.router, prefix=settings.API_V1_STR)
+app.include_router(upload.router, prefix=settings.API_V1_STR)
 
 # 注册Tortoise ORM
 register_tortoise(

@@ -6,7 +6,7 @@
     <template #actions>
       <el-button
         type="primary"
-        @click="showAddDialog = true"
+        @click="$router.push('/questions/add')"
         :icon="Plus"
         size="large"
       >
@@ -17,6 +17,17 @@
     <!-- 筛选条件 -->
     <div class="filter-section">
       <el-form :model="filters" inline>
+        <el-form-item>
+          <el-button
+            type="primary"
+            @click="$router.push('/questions/add')"
+            :icon="Plus"
+            size="default"
+          >
+            添加试题
+          </el-button>
+        </el-form-item>
+
         <el-form-item label="学期">
           <el-select v-model="filters.semester_id" placeholder="请选择学期" clearable @change="loadQuestions" style="width: 150px">
             <el-option
@@ -73,63 +84,68 @@
     
     <!-- 数据表格 -->
     <el-table :data="questions" v-loading="loading" class="modern-table">
-      <el-table-column prop="title" label="题目标题" min-width="250">
+      <el-table-column prop="title" label="题目标题"  min-width="150">
         <template #default="{ row }">
           <div class="question-title">
             <span class="title-text">{{ row.title }}</span>
-            <el-tag v-if="row.question_type" size="small" class="type-tag">
-              {{ getQuestionTypeText(row.question_type) }}
-            </el-tag>
+
           </div>
         </template>
       </el-table-column>
-      <el-table-column prop="semester.name" label="学期" width="120">
+      <el-table-column prop="question_type" label="题目类型"  width="150">
+        <template #default="{ row }">
+          <el-tag v-if="row.question_type" size="small" class="type-tag">
+              {{ getQuestionTypeText(row.question_type) }}
+            </el-tag>
+        </template>
+      </el-table-column>
+      <el-table-column prop="semester.name" label="学期" align="center" width="150">
         <template #default="{ row }">
           <el-tag v-if="row.semester" type="info" size="small">
             {{ row.semester.name }}
           </el-tag>
         </template>
       </el-table-column>
-      <el-table-column prop="grade.name" label="年级" width="100">
+      <el-table-column prop="grade.name" label="年级" align="center" width="100">
         <template #default="{ row }">
           <el-tag v-if="row.grade" type="primary" size="small">
             {{ row.grade.name }}
           </el-tag>
         </template>
       </el-table-column>
-      <el-table-column prop="subject.name" label="学科" width="100">
+      <el-table-column prop="subject.name" label="学科" align="center" width="100">
         <template #default="{ row }">
           <el-tag v-if="row.subject" type="success" size="small">
             {{ row.subject.name }}
           </el-tag>
         </template>
       </el-table-column>
-      <el-table-column prop="category.name" label="分类" width="120">
+      <el-table-column prop="category.name" label="分类" align="center" width="120">
         <template #default="{ row }">
           <el-tag v-if="row.category" type="warning" size="small">
             {{ row.category.name }}
           </el-tag>
         </template>
       </el-table-column>
-      <el-table-column prop="difficulty" label="难度" width="80">
+      <el-table-column prop="difficulty" label="难度" align="center" width="100">
         <template #default="{ row }">
           <el-tag :type="getDifficultyType(row.difficulty)" size="small">
             {{ getDifficultyText(row.difficulty) }}
           </el-tag>
         </template>
       </el-table-column>
-      <el-table-column prop="is_published" label="状态" width="100">
+      <el-table-column prop="is_published" align="center" label="状态" width="100">
         <template #default="{ row }">
           <el-tag :type="row.is_published ? 'success' : 'warning'" size="small">
             {{ row.is_published ? '已发布' : '草稿' }}
           </el-tag>
         </template>
       </el-table-column>
-      <el-table-column prop="view_count" label="查看次数" width="100" />
-      <el-table-column label="操作" width="160" fixed="right">
+      <el-table-column prop="view_count" align="center" label="查看次数" width="120" />
+      <el-table-column label="操作" align="center" width="160" fixed="right">
         <template #default="{ row }">
           <div class="action-buttons">
-            <el-button size="small" @click="editQuestion(row)" :icon="Edit" />
+            <el-button size="small" @click="$router.push(`/questions/edit/${row.id}`)" :icon="Edit" />
             <el-button
               size="small"
               type="danger"
@@ -153,154 +169,18 @@
         @current-change="loadQuestions"
       />
     </div>
-    
-    <!-- 添加/编辑对话框 -->
-    <el-dialog
-      v-model="showAddDialog"
-      :title="editingId ? '编辑试题' : '添加试题'"
-      fullscreen
-      :before-close="handleDialogClose"
-      :append-to-body="true"
-    >
-      <el-form
-        ref="formRef"
-        :model="form"
-        :rules="rules"
-        label-width="100px"
-      >
-        <el-row :gutter="20">
-          <el-col :span="12">
-            <el-form-item label="题目标题" prop="title">
-              <el-input v-model="form.title" placeholder="请输入题目标题" />
-            </el-form-item>
-          </el-col>
-          <el-col :span="12">
-            <el-form-item label="题目类型" prop="question_type">
-              <el-select v-model="form.question_type" placeholder="请选择题目类型">
-                <el-option label="单选题" value="single" />
-                <el-option label="多选题" value="multiple" />
-                <el-option label="填空题" value="fill" />
-                <el-option label="问答题" value="essay" />
-                <el-option label="判断题" value="judge" />
-              </el-select>
-            </el-form-item>
-          </el-col>
-        </el-row>
-        
-        <el-row :gutter="20">
-          <el-col :span="6">
-            <el-form-item label="学期" prop="semester_id">
-              <el-select v-model="form.semester_id" placeholder="请选择学期">
-                <el-option
-                  v-for="semester in semesters"
-                  :key="semester.id"
-                  :label="semester.name"
-                  :value="semester.id"
-                />
-              </el-select>
-            </el-form-item>
-          </el-col>
-          <el-col :span="6">
-            <el-form-item label="年级" prop="grade_id">
-              <el-select v-model="form.grade_id" placeholder="请选择年级">
-                <el-option
-                  v-for="grade in grades"
-                  :key="grade.id"
-                  :label="grade.name"
-                  :value="grade.id"
-                />
-              </el-select>
-            </el-form-item>
-          </el-col>
-          <el-col :span="6">
-            <el-form-item label="学科" prop="subject_id">
-              <el-select v-model="form.subject_id" placeholder="请选择学科" @change="onSubjectChange">
-                <el-option
-                  v-for="subject in subjects"
-                  :key="subject.id"
-                  :label="subject.name"
-                  :value="subject.id"
-                />
-              </el-select>
-            </el-form-item>
-          </el-col>
-          <el-col :span="6">
-            <el-form-item label="分类" prop="category_id">
-              <el-select v-model="form.category_id" placeholder="请选择分类">
-                <el-option
-                  v-for="category in filteredCategories"
-                  :key="category.id"
-                  :label="category.name"
-                  :value="category.id"
-                />
-              </el-select>
-            </el-form-item>
-          </el-col>
-        </el-row>
-        
-        <el-row :gutter="20">
-          <el-col :span="8">
-            <el-form-item label="难度等级" prop="difficulty">
-              <el-select v-model="form.difficulty" placeholder="请选择难度">
-                <el-option label="简单" :value="1" />
-                <el-option label="较易" :value="2" />
-                <el-option label="中等" :value="3" />
-                <el-option label="较难" :value="4" />
-                <el-option label="困难" :value="5" />
-              </el-select>
-            </el-form-item>
-          </el-col>
-          <el-col :span="8">
-            <el-form-item label="是否发布" prop="is_published">
-              <el-switch v-model="form.is_published" />
-            </el-form-item>
-          </el-col>
-          <el-col :span="8">
-            <el-form-item label="是否激活" prop="is_active">
-              <el-switch v-model="form.is_active" />
-            </el-form-item>
-          </el-col>
-        </el-row>
-        
-        <el-form-item label="题目内容" prop="content">
-          <RichTextEditor
-            v-model="form.content"
-            placeholder="请输入题目内容，支持富文本编辑和注音功能"
-            height="500px"
-          />
-        </el-form-item>
-        
-        <el-form-item label="标签">
-          <el-input
-            v-model="form.tags"
-            placeholder="请输入标签，多个标签用逗号分隔"
-          />
-        </el-form-item>
-      </el-form>
-      
-      <template #footer>
-        <el-button @click="handleDialogClose">取消</el-button>
-        <el-button type="primary" @click="saveQuestion" :loading="saving">
-          确定
-        </el-button>
-      </template>
-    </el-dialog>
+
   </PageLayout>
 </template>
 
 <script setup>
-import { ref, reactive, computed, onMounted } from 'vue'
+import { ref, reactive, onMounted } from 'vue'
 import { Plus, Edit, Delete, Search, Refresh } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import api from '../utils/api'
-import RichTextEditor from '../components/RichTextEditor.vue'
 import PageLayout from '../components/PageLayout.vue'
 
 const loading = ref(false)
-const saving = ref(false)
-const showAddDialog = ref(false)
-const editingId = ref(null)
-const formRef = ref()
 
 const questions = ref([])
 const semesters = ref([])
@@ -319,46 +199,6 @@ const filters = reactive({
   grade_id: null,
   subject_id: null,
   search: ''
-})
-
-const form = reactive({
-  title: '',
-  content: '',
-  difficulty: 1,
-  question_type: 'single',
-  semester_id: null,
-  grade_id: null,
-  subject_id: null,
-  category_id: null,
-  is_active: true,
-  is_published: false,
-  tags: ''
-})
-
-const rules = {
-  title: [
-    { required: true, message: '请输入题目标题', trigger: 'blur' }
-  ],
-  content: [
-    { required: true, message: '请输入题目内容', trigger: 'blur' }
-  ],
-  semester_id: [
-    { required: true, message: '请选择学期', trigger: 'change' }
-  ],
-  grade_id: [
-    { required: true, message: '请选择年级', trigger: 'change' }
-  ],
-  subject_id: [
-    { required: true, message: '请选择学科', trigger: 'change' }
-  ],
-  category_id: [
-    { required: true, message: '请选择分类', trigger: 'change' }
-  ]
-}
-
-const filteredCategories = computed(() => {
-  if (!form.subject_id) return []
-  return categories.value.filter(cat => cat.subject_id === form.subject_id)
 })
 
 onMounted(() => {
@@ -410,48 +250,7 @@ async function loadQuestions() {
   }
 }
 
-function editQuestion(question) {
-  editingId.value = question.id
-  Object.assign(form, {
-    title: question.title,
-    content: question.content,
-    difficulty: question.difficulty,
-    question_type: question.question_type,
-    semester_id: question.semester_id,
-    grade_id: question.grade_id,
-    subject_id: question.subject_id,
-    category_id: question.category_id,
-    is_active: question.is_active,
-    is_published: question.is_published,
-    tags: question.tags || ''
-  })
-  showAddDialog.value = true
-}
 
-async function saveQuestion() {
-  if (!formRef.value) return
-
-  try {
-    await formRef.value.validate()
-    saving.value = true
-
-    if (editingId.value) {
-      await api.put(`/questions/${editingId.value}`, form)
-      ElMessage.success('更新成功')
-    } else {
-      await api.post('/questions/', form)
-      ElMessage.success('添加成功')
-    }
-
-    showAddDialog.value = false
-    resetForm()
-    loadQuestions()
-  } catch (error) {
-    // 错误已在拦截器中处理
-  } finally {
-    saving.value = false
-  }
-}
 
 async function deleteQuestion(question) {
   try {
@@ -471,10 +270,6 @@ async function deleteQuestion(question) {
   }
 }
 
-function onSubjectChange() {
-  form.category_id = null
-}
-
 function resetFilters() {
   Object.assign(filters, {
     semester_id: null,
@@ -484,29 +279,6 @@ function resetFilters() {
   })
   pagination.page = 1
   loadQuestions()
-}
-
-function resetForm() {
-  editingId.value = null
-  Object.assign(form, {
-    title: '',
-    content: '',
-    difficulty: 1,
-    question_type: 'single',
-    semester_id: null,
-    grade_id: null,
-    subject_id: null,
-    category_id: null,
-    is_active: true,
-    is_published: false,
-    tags: ''
-  })
-  formRef.value?.resetFields()
-}
-
-function handleDialogClose() {
-  showAddDialog.value = false
-  resetForm()
 }
 
 function getDifficultyText(difficulty) {
@@ -570,61 +342,7 @@ function getQuestionTypeText(type) {
   justify-content: center;
 }
 
-/* 全屏对话框样式优化 */
-:deep(.el-dialog.is-fullscreen) {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  margin: 0 !important;
-  width: 100vw !important;
-  height: 100vh !important;
-  max-width: none !important;
-  max-height: none !important;
-  top: 0 !important;
-  left: 0 !important;
-  position: fixed !important;
-  z-index: 2000 !important;
-}
 
-:deep(.el-dialog.is-fullscreen .el-dialog__header) {
-  background: rgba(255, 255, 255, 0.95);
-  backdrop-filter: blur(10px);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.2);
-  padding: 20px 30px;
-  margin: 0;
-}
-
-:deep(.el-dialog.is-fullscreen .el-dialog__title) {
-  color: #2d3748;
-  font-size: 24px;
-  font-weight: 700;
-}
-
-:deep(.el-dialog.is-fullscreen .el-dialog__body) {
-  background: rgba(255, 255, 255, 0.95);
-  backdrop-filter: blur(10px);
-  padding: 30px;
-  height: calc(100vh - 140px);
-  overflow-y: auto;
-  margin: 0;
-}
-
-:deep(.el-dialog.is-fullscreen .el-dialog__footer) {
-  background: rgba(255, 255, 255, 0.95);
-  backdrop-filter: blur(10px);
-  border-top: 1px solid rgba(255, 255, 255, 0.2);
-  padding: 20px 30px;
-  text-align: right;
-  margin: 0;
-}
-
-/* 确保对话框遮罩层覆盖整个屏幕 */
-:deep(.el-overlay) {
-  position: fixed !important;
-  top: 0 !important;
-  left: 0 !important;
-  width: 100vw !important;
-  height: 100vh !important;
-  z-index: 1999 !important;
-}
 
 .pagination-section {
   display: flex;
@@ -671,42 +389,5 @@ function getQuestionTypeText(type) {
   border-color: #667eea;
 }
 
-:deep(.el-form-item) {
-  margin-bottom: 20px;
-}
 
-:deep(.el-form-item__label) {
-  font-weight: 500;
-  color: #4a5568;
-}
-
-:deep(.el-dialog) {
-  border-radius: 16px;
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.2);
-  backdrop-filter: blur(10px);
-}
-
-:deep(.el-dialog__header) {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  color: white;
-  border-radius: 16px 16px 0 0;
-  padding: 20px 24px;
-}
-
-:deep(.el-dialog__title) {
-  color: white;
-  font-weight: 600;
-  font-size: 18px;
-}
-
-:deep(.el-dialog__body) {
-  padding: 24px;
-  max-height: 70vh;
-  overflow-y: auto;
-}
-
-:deep(.el-dialog__footer) {
-  padding: 16px 24px 24px;
-  text-align: right;
-}
 </style>

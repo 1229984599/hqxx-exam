@@ -20,4 +20,4 @@ class Category(BaseModel):
         unique_together = (("subject", "code"),)
     
     def __str__(self):
-        return f"{self.subject.name} - {self.name}"
+        return self.name
