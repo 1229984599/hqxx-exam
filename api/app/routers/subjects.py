@@ -13,6 +13,7 @@ router = APIRouter(prefix="/subjects", tags=["学科管理"])
 @router.get("/", response_model=List[SubjectResponse], summary="获取学科列表")
 async def get_subjects(
     is_active: bool = Query(None, description="是否激活"),
+    search: str = Query(None, description="搜索关键词"),
     skip: int = Query(0, ge=0, description="跳过数量"),
     limit: int = Query(100, ge=1, le=100, description="限制数量")
 ):
@@ -21,7 +22,10 @@ async def get_subjects(
     
     if is_active is not None:
         query = query.filter(is_active=is_active)
-    
+
+    if search:
+        query = query.filter(name__icontains=search) | query.filter(code__icontains=search)
+
     subjects = await query.offset(skip).limit(limit).order_by("sort_order", "id")
     return subjects
 

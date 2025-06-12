@@ -101,6 +101,13 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
+  // 更新用户信息
+  function updateUser(userData) {
+    if (user.value) {
+      Object.assign(user.value, userData)
+    }
+  }
+
   // 获取token信息
   function getTokenInfo() {
     return tokenManager.getTokenInfo()
@@ -127,6 +134,7 @@ export const useAuthStore = defineStore('auth', () => {
     fetchUser,
     logout,
     refreshToken,
+    updateUser,
     getTokenInfo,
     initialize
   }

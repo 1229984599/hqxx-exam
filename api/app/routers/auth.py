@@ -2,7 +2,7 @@ from datetime import timedelta
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordRequestForm
 from app.models.admin import Admin
-from app.schemas.auth import Token, AdminLogin, AdminCreate, AdminResponse
+from app.schemas.auth import Token, AdminLogin, AdminCreate, AdminResponse, AdminUpdate
 from app.utils.auth import verify_password, get_password_hash, create_access_token, verify_token_with_detail
 from app.dependencies.auth import get_current_active_admin, get_current_superuser
 from app.config import settings
@@ -197,4 +197,51 @@ async def register_admin(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"创建管理员账户失败：{str(e)}"
+        )
+
+
+@router.put("/profile", response_model=AdminResponse, summary="更新个人资料")
+async def update_profile(
+    profile_data: AdminUpdate,
+    current_admin: Admin = Depends(get_current_active_admin)
+):
+    """更新当前用户的个人资料"""
+    try:
+        # 检查邮箱是否已被其他用户使用
+        if profile_data.email and profile_data.email.strip():
+            existing_email = await Admin.filter(
+                email=profile_data.email.strip().lower()
+            ).exclude(id=current_admin.id).first()
+
+            if existing_email:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"邮箱 '{profile_data.email}' 已被其他用户使用"
+                )
+
+        # 更新用户信息
+        update_data = {}
+        if profile_data.email is not None:
+            update_data['email'] = profile_data.email.strip().lower()
+        if profile_data.full_name is not None:
+            update_data['full_name'] = profile_data.full_name.strip() if profile_data.full_name else None
+        if profile_data.phone is not None:
+            update_data['phone'] = profile_data.phone.strip() if profile_data.phone else None
+        if profile_data.avatar is not None:
+            update_data['avatar'] = profile_data.avatar
+
+        if update_data:
+            await Admin.filter(id=current_admin.id).update(**update_data)
+            # 重新获取更新后的用户信息
+            updated_admin = await Admin.get(id=current_admin.id)
+            return updated_admin
+
+        return current_admin
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"更新个人资料失败：{str(e)}"
         )

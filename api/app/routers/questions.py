@@ -1,16 +1,17 @@
 import random
 from typing import List, Optional
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Body
 from app.models.question import Question
 from app.models.semester import Semester
 from app.models.grade import Grade
 from app.models.subject import Subject
 from app.models.category import Category
 from app.schemas.common import (
-    QuestionCreate, QuestionUpdate, QuestionResponse, 
+    QuestionCreate, QuestionUpdate, QuestionResponse,
     MessageResponse
 )
 from app.dependencies.auth import get_current_active_admin
+from pydantic import BaseModel
 
 router = APIRouter(prefix="/questions", tags=["试题管理"])
 
@@ -434,6 +435,167 @@ async def delete_question(
     question = await Question.filter(id=question_id).first()
     if not question:
         raise HTTPException(status_code=404, detail="Question not found")
-    
+
     await question.delete()
     return {"message": "Question deleted successfully"}
+
+
+# 批量操作相关的Schema
+class BatchUpdateRequest(BaseModel):
+    question_ids: List[int]
+    update_data: dict
+
+
+class BatchDeleteRequest(BaseModel):
+    question_ids: List[int]
+
+
+class BatchCopyRequest(BaseModel):
+    question_ids: List[int]
+    target_category_id: Optional[int] = None
+    target_subject_id: Optional[int] = None
+    target_grade_id: Optional[int] = None
+    target_semester_id: Optional[int] = None
+
+
+@router.post("/batch/update", summary="批量更新试题")
+async def batch_update_questions(
+    request: BatchUpdateRequest,
+    current_admin = Depends(get_current_active_admin)
+):
+    """批量更新试题"""
+    if not request.question_ids:
+        raise HTTPException(status_code=400, detail="No question IDs provided")
+
+    # 验证题目是否存在
+    questions = await Question.filter(id__in=request.question_ids)
+    if len(questions) != len(request.question_ids):
+        raise HTTPException(status_code=400, detail="Some questions not found")
+
+    # 验证更新数据中的关联字段
+    update_data = request.update_data.copy()
+
+    if 'semester_id' in update_data:
+        semester = await Semester.filter(id=update_data['semester_id']).first()
+        if not semester:
+            raise HTTPException(status_code=400, detail="Semester not found")
+
+    if 'grade_id' in update_data:
+        grade = await Grade.filter(id=update_data['grade_id']).first()
+        if not grade:
+            raise HTTPException(status_code=400, detail="Grade not found")
+
+    if 'subject_id' in update_data:
+        subject = await Subject.filter(id=update_data['subject_id']).first()
+        if not subject:
+            raise HTTPException(status_code=400, detail="Subject not found")
+
+    if 'category_id' in update_data:
+        category = await Category.filter(id=update_data['category_id']).first()
+        if not category:
+            raise HTTPException(status_code=400, detail="Category not found")
+
+    # 执行批量更新
+    await Question.filter(id__in=request.question_ids).update(**update_data)
+
+    return {
+        "message": f"Successfully updated {len(request.question_ids)} questions",
+        "updated_count": len(request.question_ids)
+    }
+
+
+@router.post("/batch/delete", summary="批量删除试题")
+async def batch_delete_questions(
+    request: BatchDeleteRequest,
+    current_admin = Depends(get_current_active_admin)
+):
+    """批量删除试题"""
+    if not request.question_ids:
+        raise HTTPException(status_code=400, detail="No question IDs provided")
+
+    # 验证题目是否存在
+    questions = await Question.filter(id__in=request.question_ids)
+    if len(questions) != len(request.question_ids):
+        raise HTTPException(status_code=400, detail="Some questions not found")
+
+    # 执行批量删除
+    deleted_count = await Question.filter(id__in=request.question_ids).delete()
+
+    return {
+        "message": f"Successfully deleted {deleted_count} questions",
+        "deleted_count": deleted_count
+    }
+
+
+@router.post("/batch/copy", summary="批量复制试题")
+async def batch_copy_questions(
+    request: BatchCopyRequest,
+    current_admin = Depends(get_current_active_admin)
+):
+    """批量复制试题"""
+    if not request.question_ids:
+        raise HTTPException(status_code=400, detail="No question IDs provided")
+
+    # 获取原始题目
+    original_questions = await Question.filter(id__in=request.question_ids).prefetch_related(
+        "semester", "grade", "subject", "category"
+    )
+
+    if len(original_questions) != len(request.question_ids):
+        raise HTTPException(status_code=400, detail="Some questions not found")
+
+    # 验证目标关联数据
+    target_semester = None
+    target_grade = None
+    target_subject = None
+    target_category = None
+
+    if request.target_semester_id:
+        target_semester = await Semester.filter(id=request.target_semester_id).first()
+        if not target_semester:
+            raise HTTPException(status_code=400, detail="Target semester not found")
+
+    if request.target_grade_id:
+        target_grade = await Grade.filter(id=request.target_grade_id).first()
+        if not target_grade:
+            raise HTTPException(status_code=400, detail="Target grade not found")
+
+    if request.target_subject_id:
+        target_subject = await Subject.filter(id=request.target_subject_id).first()
+        if not target_subject:
+            raise HTTPException(status_code=400, detail="Target subject not found")
+
+    if request.target_category_id:
+        target_category = await Category.filter(id=request.target_category_id).first()
+        if not target_category:
+            raise HTTPException(status_code=400, detail="Target category not found")
+
+    # 复制题目
+    copied_questions = []
+    for original in original_questions:
+        question_data = {
+            "title": f"{original.title} (副本)",
+            "content": original.content,
+            "answer": original.answer,
+            "difficulty": original.difficulty,
+            "question_type": original.question_type,
+            "semester": target_semester or original.semester,
+            "grade": target_grade or original.grade,
+            "subject": target_subject or original.subject,
+            "category": target_category or original.category,
+            "is_active": original.is_active,
+            "is_published": False,  # 复制的题目默认未发布
+            "tags": original.tags,
+            "source": original.source,
+            "author": original.author,
+            "view_count": 0  # 重置查看次数
+        }
+
+        copied_question = await Question.create(**question_data)
+        copied_questions.append(copied_question)
+
+    return {
+        "message": f"Successfully copied {len(copied_questions)} questions",
+        "copied_count": len(copied_questions),
+        "copied_question_ids": [q.id for q in copied_questions]
+    }

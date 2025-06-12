@@ -74,6 +74,36 @@ const router = createRouter({
           path: 'tinymce-test',
           name: 'tinymce-test',
           component: () => import('../views/TinyMCETestView.vue')
+        },
+        {
+          path: 'system',
+          name: 'system',
+          component: () => import('../views/SystemView.vue')
+        },
+        {
+          path: 'search',
+          name: 'search',
+          component: () => import('../views/SearchResultsView.vue')
+        },
+        {
+          path: 'profile',
+          name: 'profile',
+          component: () => import('../views/ProfileView.vue')
+        },
+        {
+          path: 'system/logs',
+          name: 'system-logs',
+          component: () => import('../views/SystemLogsView.vue')
+        },
+        {
+          path: 'system/backup',
+          name: 'backup-management',
+          component: () => import('../views/BackupManagementView.vue')
+        },
+        {
+          path: 'system/settings',
+          name: 'system-settings',
+          component: () => import('../views/SystemSettingsView.vue')
         }
       ]
     }

@@ -14,22 +14,26 @@
       </el-button>
     </template>
 
-    <!-- 筛选条件 -->
+    <!-- 搜索筛选区域 -->
     <div class="filter-section">
       <el-form :model="filters" inline>
         <el-form-item>
-          <el-button
-            type="primary"
-            @click="$router.push('/questions/add')"
-            :icon="Plus"
-            size="default"
-          >
-            添加试题
-          </el-button>
+          <el-input
+            v-model="filters.search"
+            placeholder="搜索题目标题"
+            :prefix-icon="Search"
+            clearable
+            style="width: 250px"
+          />
         </el-form-item>
-
-        <el-form-item label="学期">
-          <el-select v-model="filters.semester_id" placeholder="请选择学期" clearable @change="loadQuestions" style="width: 150px">
+        
+        <el-form-item>
+          <el-select
+            v-model="filters.semester_id"
+            placeholder="学期"
+            clearable
+            style="width: 140px"
+          >
             <el-option
               v-for="semester in semesters"
               :key="semester.id"
@@ -39,8 +43,13 @@
           </el-select>
         </el-form-item>
 
-        <el-form-item label="年级">
-          <el-select v-model="filters.grade_id" placeholder="请选择年级" clearable @change="loadQuestions" style="width: 150px">
+        <el-form-item>
+          <el-select
+            v-model="filters.grade_id"
+            placeholder="年级"
+            clearable
+            style="width: 140px"
+          >
             <el-option
               v-for="grade in grades"
               :key="grade.id"
@@ -50,8 +59,13 @@
           </el-select>
         </el-form-item>
 
-        <el-form-item label="学科">
-          <el-select v-model="filters.subject_id" placeholder="请选择学科" clearable @change="loadQuestions" style="width: 150px">
+        <el-form-item>
+          <el-select
+            v-model="filters.subject_id"
+            placeholder="学科"
+            clearable
+            style="width: 140px"
+          >
             <el-option
               v-for="subject in subjects"
               :key="subject.id"
@@ -61,16 +75,6 @@
           </el-select>
         </el-form-item>
 
-        <el-form-item label="搜索">
-          <el-input
-            v-model="filters.search"
-            placeholder="搜索题目标题"
-            clearable
-            style="width: 200px"
-            @keyup.enter="loadQuestions"
-          />
-        </el-form-item>
-
         <el-form-item>
           <el-button type="primary" @click="loadQuestions" :icon="Search">
             搜索
@@ -78,62 +82,82 @@
           <el-button @click="resetFilters" :icon="Refresh">
             重置
           </el-button>
+          <el-button type="success" @click="$router.push('/questions/add')" :icon="Plus">
+            添加试题
+          </el-button>
         </el-form-item>
       </el-form>
     </div>
-    
+
+    <!-- 批量操作 -->
+    <BatchOperations
+      :items="questions"
+      v-model:selectedItems="selectedQuestions"
+      @refresh="loadQuestions"
+    />
+
     <!-- 数据表格 -->
-    <el-table :data="questions" v-loading="loading" class="modern-table">
-      <el-table-column prop="title" label="题目标题"  min-width="150">
+    <el-table
+      :data="questions"
+      v-loading="loading"
+      class="modern-table"
+      @selection-change="handleSelectionChange"
+    >
+      <!-- 选择列 -->
+      <el-table-column type="selection" width="55" />
+      <el-table-column prop="title" label="题目标题" min-width="300">
         <template #default="{ row }">
           <div class="question-title">
             <span class="title-text">{{ row.title }}</span>
-
           </div>
         </template>
       </el-table-column>
-      <el-table-column prop="question_type" label="题目类型"  width="150">
+      <el-table-column prop="question_type" label="题目类型" width="120">
         <template #default="{ row }">
-          <el-tag v-if="row.question_type" size="small" class="type-tag">
+          <div class="question-title">
+            <el-tag
+              :type="getQuestionTypeColor(row.question_type)"
+              size="small"
+              class="type-tag"
+            >
               {{ getQuestionTypeText(row.question_type) }}
             </el-tag>
+          </div>
         </template>
       </el-table-column>
-      <el-table-column prop="semester.name" label="学期" align="center" width="150">
+      
+      <el-table-column prop="semester.name" label="学期" width="120" align="center">
         <template #default="{ row }">
-          <el-tag v-if="row.semester" type="info" size="small">
+          <el-tag v-if="row.semester" type="success" size="small">
             {{ row.semester.name }}
           </el-tag>
         </template>
       </el-table-column>
-      <el-table-column prop="grade.name" label="年级" align="center" width="100">
+      
+      <el-table-column prop="grade.name" label="年级" width="120" align="center">
         <template #default="{ row }">
-          <el-tag v-if="row.grade" type="primary" size="small">
+          <el-tag v-if="row.grade" type="info" size="small">
             {{ row.grade.name }}
           </el-tag>
         </template>
       </el-table-column>
-      <el-table-column prop="subject.name" label="学科" align="center" width="100">
+      
+      <el-table-column prop="subject.name" label="学科" width="120" align="center">
         <template #default="{ row }">
-          <el-tag v-if="row.subject" type="success" size="small">
+          <el-tag v-if="row.subject" type="primary" size="small">
             {{ row.subject.name }}
           </el-tag>
         </template>
       </el-table-column>
-      <el-table-column prop="category.name" label="分类" align="center" width="120">
-        <template #default="{ row }">
-          <el-tag v-if="row.category" type="warning" size="small">
-            {{ row.category.name }}
-          </el-tag>
-        </template>
-      </el-table-column>
-      <el-table-column prop="difficulty" label="难度" align="center" width="100">
+      
+      <el-table-column prop="difficulty" label="难度" width="100" align="center">
         <template #default="{ row }">
           <el-tag :type="getDifficultyType(row.difficulty)" size="small">
             {{ getDifficultyText(row.difficulty) }}
           </el-tag>
         </template>
       </el-table-column>
+      
       <el-table-column prop="is_published" align="center" label="状态" width="100">
         <template #default="{ row }">
           <el-tag :type="row.is_published ? 'success' : 'warning'" size="small">
@@ -165,11 +189,10 @@
         :total="pagination.total"
         :page-sizes="[10, 20, 50, 100]"
         layout="total, sizes, prev, pager, next, jumper"
-        @size-change="loadQuestions"
-        @current-change="loadQuestions"
+        @size-change="handleSizeChange"
+        @current-change="handleCurrentChange"
       />
     </div>
-
   </PageLayout>
 </template>
 
@@ -178,15 +201,17 @@ import { ref, reactive, onMounted } from 'vue'
 import { Plus, Edit, Delete, Search, Refresh } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import api from '../utils/api'
+import { getDifficultyText, getDifficultyType, getQuestionTypeText } from '../composables/useCrud'
 import PageLayout from '../components/PageLayout.vue'
+import BatchOperations from '../components/BatchOperations.vue'
 
 const loading = ref(false)
 
 const questions = ref([])
+const selectedQuestions = ref([])
 const semesters = ref([])
 const grades = ref([])
 const subjects = ref([])
-const categories = ref([])
 
 const pagination = reactive({
   page: 1,
@@ -208,17 +233,15 @@ onMounted(() => {
 
 async function loadBasicData() {
   try {
-    const [semestersRes, gradesRes, subjectsRes, categoriesRes] = await Promise.all([
+    const [semestersRes, gradesRes, subjectsRes] = await Promise.all([
       api.get('/semesters/'),
       api.get('/grades/'),
-      api.get('/subjects/'),
-      api.get('/categories/')
+      api.get('/subjects/')
     ])
-
+    
     semesters.value = semestersRes.data
     grades.value = gradesRes.data
     subjects.value = subjectsRes.data
-    categories.value = categoriesRes.data
   } catch (error) {
     ElMessage.error('加载基础数据失败')
   }
@@ -228,29 +251,31 @@ async function loadQuestions() {
   loading.value = true
   try {
     const params = {
-      skip: (pagination.page - 1) * pagination.size,
-      limit: pagination.size,
-      ...filters
+      page: pagination.page,
+      size: pagination.size
     }
-
-    // 移除空值
-    Object.keys(params).forEach(key => {
-      if (params[key] === null || params[key] === '') {
-        delete params[key]
-      }
-    })
+    
+    // 添加筛选条件
+    if (filters.semester_id) params.semester_id = filters.semester_id
+    if (filters.grade_id) params.grade_id = filters.grade_id
+    if (filters.subject_id) params.subject_id = filters.subject_id
+    if (filters.search) params.search = filters.search
 
     const response = await api.get('/questions/', { params })
-    questions.value = response.data
-    pagination.total = response.data.length
+    
+    if (response.data.results) {
+      questions.value = response.data.results
+      pagination.total = response.data.total
+    } else {
+      questions.value = response.data
+      pagination.total = response.data.length
+    }
   } catch (error) {
     ElMessage.error('加载试题列表失败')
   } finally {
     loading.value = false
   }
 }
-
-
 
 async function deleteQuestion(question) {
   try {
@@ -281,25 +306,30 @@ function resetFilters() {
   loadQuestions()
 }
 
-function getDifficultyText(difficulty) {
-  const map = { 1: '简单', 2: '较易', 3: '中等', 4: '较难', 5: '困难' }
-  return map[difficulty] || '未知'
+function handleSizeChange(size) {
+  pagination.size = size
+  pagination.page = 1
+  loadQuestions()
 }
 
-function getDifficultyType(difficulty) {
-  const map = { 1: 'success', 2: 'info', 3: 'warning', 4: 'danger', 5: 'danger' }
-  return map[difficulty] || 'info'
+function handleCurrentChange(page) {
+  pagination.page = page
+  loadQuestions()
 }
 
-function getQuestionTypeText(type) {
-  const map = {
-    'single': '单选题',
-    'multiple': '多选题',
-    'fill': '填空题',
-    'essay': '问答题',
-    'judge': '判断题'
+function getQuestionTypeColor(type) {
+  const colorMap = {
+    'single': 'primary',
+    'multiple': 'success',
+    'fill': 'warning',
+    'essay': 'info',
+    'judge': 'danger'
   }
-  return map[type] || type
+  return colorMap[type] || 'info'
+}
+
+function handleSelectionChange(selection) {
+  selectedQuestions.value = selection
 }
 </script>
 
@@ -341,8 +371,6 @@ function getQuestionTypeText(type) {
   gap: 8px;
   justify-content: center;
 }
-
-
 
 .pagination-section {
   display: flex;
@@ -388,6 +416,4 @@ function getQuestionTypeText(type) {
   color: white;
   border-color: #667eea;
 }
-
-
 </style>

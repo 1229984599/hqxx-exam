@@ -57,6 +57,30 @@
         </div>
 
         <div class="menu-group">
+          <div v-show="!isCollapse" class="menu-group-title">系统管理</div>
+
+          <div class="menu-item" :class="{ active: $route.name === 'system' }" @click="$router.push('/system')">
+            <el-icon class="menu-icon"><Setting /></el-icon>
+            <span v-show="!isCollapse" class="menu-text">系统管理</span>
+          </div>
+
+          <div class="menu-item" :class="{ active: $route.name === 'system-logs' }" @click="$router.push('/system/logs')">
+            <el-icon class="menu-icon"><Document /></el-icon>
+            <span v-show="!isCollapse" class="menu-text">系统日志</span>
+          </div>
+
+          <div class="menu-item" :class="{ active: $route.name === 'backup-management' }" @click="$router.push('/system/backup')">
+            <el-icon class="menu-icon"><FolderOpened /></el-icon>
+            <span v-show="!isCollapse" class="menu-text">备份管理</span>
+          </div>
+
+          <div class="menu-item" :class="{ active: $route.name === 'system-settings' }" @click="$router.push('/system/settings')">
+            <el-icon class="menu-icon"><Tools /></el-icon>
+            <span v-show="!isCollapse" class="menu-text">系统设置</span>
+          </div>
+        </div>
+
+        <div class="menu-group">
           <div v-show="!isCollapse" class="menu-group-title">开发工具</div>
 
           <div class="menu-item" :class="{ active: $route.name === 'tinymce-test' }" @click="$router.push('/tinymce-test')">
@@ -78,6 +102,10 @@
           <div class="breadcrumb">
             <span class="breadcrumb-item">{{ getBreadcrumbText() }}</span>
           </div>
+        </div>
+
+        <div class="header-center">
+          <GlobalSearch />
         </div>
 
         <div class="header-right">
@@ -119,7 +147,7 @@
     </div>
 
     <!-- Token状态显示 -->
-    <TokenStatus :show="appStore.showTokenStatus" />
+    <TokenStatus :show="appStore.showTokenStatus === -1" />
   </div>
 </template>
 
@@ -140,11 +168,14 @@ import {
   School,
   Reading,
   Collection,
-  Edit
+  Edit,
+  FolderOpened,
+  Tools
 } from '@element-plus/icons-vue'
 import { useAuthStore, useAppStore } from '../stores'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import TokenStatus from '../components/TokenStatus.vue'
+import GlobalSearch from '../components/GlobalSearch.vue'
 
 const router = useRouter()
 const route = useRoute()
@@ -170,6 +201,11 @@ function getBreadcrumbText() {
     'templates': '模板管理',
     'template-add': '模板管理 / 添加模板',
     'template-edit': '模板管理 / 编辑模板',
+    'system': '系统管理',
+    'system-logs': '系统管理 / 系统日志',
+    'backup-management': '系统管理 / 备份管理',
+    'system-settings': '系统管理 / 系统设置',
+    'profile': '个人资料',
     'tinymce-test': '编辑器测试'
   }
   return routeNames[route.name] || '管理后台'
@@ -193,10 +229,10 @@ async function handleCommand(command) {
       }
       break
     case 'profile':
-      ElMessage.info('个人资料功能开发中...')
+      router.push('/profile')
       break
     case 'settings':
-      ElMessage.info('系统设置功能开发中...')
+      router.push('/system/settings')
       break
   }
 }
@@ -344,6 +380,15 @@ async function handleCommand(command) {
   display: flex;
   align-items: center;
   gap: 20px;
+}
+
+.header-center {
+  flex: 1;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  max-width: 600px;
+  margin: 0 auto;
 }
 
 .collapse-btn {

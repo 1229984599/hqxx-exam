@@ -27,6 +27,8 @@ class AdminCreate(BaseModel):
 class AdminUpdate(BaseModel):
     email: Optional[EmailStr] = None
     full_name: Optional[str] = None
+    phone: Optional[str] = None
+    avatar: Optional[str] = None
     is_active: Optional[bool] = None
     is_superuser: Optional[bool] = None
 
@@ -35,7 +37,9 @@ class AdminResponse(BaseModel):
     id: int
     username: str
     email: str
-    full_name: Optional[str]
+    full_name: Optional[str] = None
+    phone: Optional[str] = None
+    avatar: Optional[str] = None
     is_active: bool
     is_superuser: bool
     

@@ -13,6 +13,7 @@ router = APIRouter(prefix="/semesters", tags=["学期管理"])
 @router.get("/", response_model=List[SemesterResponse], summary="获取学期列表")
 async def get_semesters(
     is_active: bool = Query(None, description="是否激活"),
+    search: str = Query(None, description="搜索关键词"),
     skip: int = Query(0, ge=0, description="跳过数量"),
     limit: int = Query(100, ge=1, le=100, description="限制数量")
 ):
@@ -21,7 +22,10 @@ async def get_semesters(
     
     if is_active is not None:
         query = query.filter(is_active=is_active)
-    
+
+    if search:
+        query = query.filter(name__icontains=search) | query.filter(code__icontains=search)
+
     semesters = await query.offset(skip).limit(limit).order_by("sort_order", "id")
     return semesters
 

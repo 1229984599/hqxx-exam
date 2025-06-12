@@ -8,6 +8,8 @@ class Admin(BaseModel):
     email = fields.CharField(max_length=100, unique=True, description="邮箱")
     hashed_password = fields.CharField(max_length=255, description="密码哈希")
     full_name = fields.CharField(max_length=100, null=True, description="姓名")
+    phone = fields.CharField(max_length=20, null=True, description="手机号")
+    avatar = fields.CharField(max_length=500, null=True, description="头像URL")
     is_active = fields.BooleanField(default=True, description="是否激活")
     is_superuser = fields.BooleanField(default=False, description="是否超级管理员")
     
