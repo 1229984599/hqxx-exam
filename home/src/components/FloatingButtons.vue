@@ -219,7 +219,7 @@ const availableButtons = [
 const buttonSettings = reactive({
   print: false,
   share: false,
-  favorite: true,
+  favorite: false,
   next: true,  // 换一题按钮默认显示
   scrollTop: false
 })
@@ -246,7 +246,7 @@ const loadSettings = () => {
 const resetSettings = () => {
   buttonSettings.print = false
   buttonSettings.share = false
-  buttonSettings.favorite = true
+  buttonSettings.favorite = false
   buttonSettings.next = true  // 换一题按钮始终显示
   buttonSettings.scrollTop = false
   saveSettings()

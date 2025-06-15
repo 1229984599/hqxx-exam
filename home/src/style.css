@@ -643,3 +643,74 @@
   transform: translateY(-20px);
   opacity: 0;
 }
+
+/*拼音相关样式*/
+ruby {
+      ruby-align: center;
+      display: inline-block;
+      white-space: nowrap;
+      margin: 0 2px;
+      vertical-align: baseline;
+      line-height: 2.2;
+      position: relative;
+    }
+    ruby.pinyin-ruby {
+      /*background: rgba(64, 158, 255, 0.05);*/
+      border-radius: 4px;
+      padding: 3px 2px 1px 2px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      border: 1px solid transparent;
+      margin: 0 1px;
+      position: relative;
+    }
+    ruby.pinyin-ruby:hover {
+      background: rgba(64, 158, 255, 0.1);
+      border-color: rgba(64, 158, 255, 0.3);
+      transform: translateY(-1px);
+      box-shadow: 0 2px 4px rgba(64, 158, 255, 0.2);
+    }
+    ruby.pinyin-ruby:focus-within {
+      background: rgba(64, 158, 255, 0.15);
+      border-color: rgba(64, 158, 255, 0.5);
+      outline: none;
+    }
+    rt {
+      color: #409eff;
+      font-weight: 500;
+      display: block;
+      text-align: center;
+      line-height: 1.2;
+      margin-bottom: 3px;
+      user-select: none;
+      min-width: 1em;
+      padding: 0 1px;
+      position: relative;
+      z-index: 1;
+      /* 如果没有设置具体字体大小，使用相对大小 */
+      font-size: 0.75em;
+    }
+    /* 当rt有具体字体大小时，优先使用 */
+    rt[style*="font-size"] {
+      font-size: inherit !important;
+    }
+    rb {
+      border-bottom: 1px dotted #409eff;
+      display: block;
+      text-align: center;
+      user-select: text;
+      line-height: 1.4;
+      position: relative;
+      z-index: 1;
+      /* 如果没有设置具体字体大小，使用默认大小 */
+      font-size: 1em;
+    }
+    /* 当rb有具体字体大小时，优先使用 */
+    rb[style*="font-size"] {
+      font-size: inherit !important;
+    }
+    /* 确保拼音注音在编辑器中正确显示 */
+    ruby:not(.pinyin-ruby) {
+      background: transparent;
+      padding: 0;
+    }

@@ -1,0 +1,5 @@
+/home/node_modules/
+/api/.venv/
+/admin/node_modules/
+/admin/dist/
+/.codelf/
