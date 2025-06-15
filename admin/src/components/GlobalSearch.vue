@@ -263,7 +263,7 @@ onUnmounted(() => {
 // 监听搜索查询
 watch(searchQuery, debounce(async (newQuery) => {
   if (newQuery.trim()) {
-    await performSearch(newQuery.trim())
+    await performSearch((newQuery || '').trim())
   } else {
     searchResults.value = {}
     selectedIndex.value = -1

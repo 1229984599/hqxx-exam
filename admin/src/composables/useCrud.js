@@ -61,13 +61,13 @@ export function useCrud(apiPath, options = {}) {
     }
 
     // 按搜索关键词筛选
-    if (filters.search) {
+    if (filters.search && typeof filters.search === 'string') {
       const searchLower = filters.search.toLowerCase()
       filtered = filtered.filter(item => {
-        // 搜索name和code字段
-        return (item.name && item.name.toLowerCase().includes(searchLower)) ||
-               (item.code && item.code.toLowerCase().includes(searchLower)) ||
-               (item.title && item.title.toLowerCase().includes(searchLower))
+        // 搜索name和code字段，确保字段存在且为字符串
+        return (item.name && typeof item.name === 'string' && item.name.toLowerCase().includes(searchLower)) ||
+               (item.code && typeof item.code === 'string' && item.code.toLowerCase().includes(searchLower)) ||
+               (item.title && typeof item.title === 'string' && item.title.toLowerCase().includes(searchLower))
       })
     }
 

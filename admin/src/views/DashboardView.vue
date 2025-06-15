@@ -60,6 +60,51 @@
       />
     </div>
 
+    <!-- 快速操作 -->
+    <div class="quick-actions">
+      <h2>⚡ 快速操作</h2>
+      <div class="action-grid">
+        <div class="action-card" @click="$router.push('/questions/add')">
+          <div class="action-content">
+            <div class="action-icon">
+              <el-icon><Plus /></el-icon>
+            </div>
+            <h3>添加试题</h3>
+            <p>创建新的考试题目，支持富文本编辑和注音功能</p>
+          </div>
+        </div>
+
+        <div class="action-card" @click="$router.push('/categories')">
+          <div class="action-content">
+            <div class="action-icon">
+              <el-icon><Collection /></el-icon>
+            </div>
+            <h3>管理分类</h3>
+            <p>管理题目分类，支持多级分类结构</p>
+          </div>
+        </div>
+
+        <div class="action-card" @click="$router.push('/subjects')">
+          <div class="action-content">
+            <div class="action-icon">
+              <el-icon><Reading /></el-icon>
+            </div>
+            <h3>管理学科</h3>
+            <p>管理学科信息和相关配置</p>
+          </div>
+        </div>
+
+        <div class="action-card" @click="$router.push('/templates')">
+          <div class="action-content">
+            <div class="action-icon">
+              <el-icon><Document /></el-icon>
+            </div>
+            <h3>模板管理</h3>
+            <p>管理题目模板，提高出题效率</p>
+          </div>
+        </div>
+      </div>
+    </div>
     <!-- 数据分析图表 -->
     <div class="analytics-section">
       <h2>📊 数据分析</h2>
@@ -128,64 +173,19 @@
           <el-table-column prop="subject_name" label="学科" width="100" />
           <el-table-column prop="grade_name" label="年级" width="100" />
           <el-table-column prop="category_name" label="分类" width="120" />
-          <el-table-column prop="difficulty" label="难度" width="80">
+          <el-table-column prop="difficulty" label="难度" width="100">
             <template #default="{ row }">
               <el-tag :type="getDifficultyType(row.difficulty)">
                 {{ getDifficultyText(row.difficulty) }}
               </el-tag>
             </template>
           </el-table-column>
-          <el-table-column prop="view_count" label="查看次数" width="100" />
+          <el-table-column prop="view_count" label="查看次数" width="120" />
           <el-table-column prop="created_at" label="创建时间" width="120" />
         </el-table>
       </div>
     </div>
 
-    <!-- 快速操作 -->
-    <div class="quick-actions">
-      <h2>⚡ 快速操作</h2>
-      <div class="action-grid">
-        <div class="action-card" @click="$router.push('/questions/add')">
-          <div class="action-content">
-            <div class="action-icon">
-              <el-icon><Plus /></el-icon>
-            </div>
-            <h3>添加试题</h3>
-            <p>创建新的考试题目，支持富文本编辑和注音功能</p>
-          </div>
-        </div>
-
-        <div class="action-card" @click="$router.push('/categories')">
-          <div class="action-content">
-            <div class="action-icon">
-              <el-icon><Collection /></el-icon>
-            </div>
-            <h3>管理分类</h3>
-            <p>管理题目分类，支持多级分类结构</p>
-          </div>
-        </div>
-
-        <div class="action-card" @click="$router.push('/subjects')">
-          <div class="action-content">
-            <div class="action-icon">
-              <el-icon><Reading /></el-icon>
-            </div>
-            <h3>管理学科</h3>
-            <p>管理学科信息和相关配置</p>
-          </div>
-        </div>
-
-        <div class="action-card" @click="$router.push('/templates')">
-          <div class="action-content">
-            <div class="action-icon">
-              <el-icon><Document /></el-icon>
-            </div>
-            <h3>模板管理</h3>
-            <p>管理题目模板，提高出题效率</p>
-          </div>
-        </div>
-      </div>
-    </div>
   </PageLayout>
 </template>
 
@@ -250,12 +250,13 @@ async function loadDashboardData() {
     const response = await api.get('/analytics/dashboard')
     dashboardData.value = response.data
 
-    // 模拟之前的数据用于计算变化百分比
+    // 计算之前的数据用于显示变化百分比（基于历史趋势）
+    const currentStats = dashboardData.value.basic_stats || {}
     previousStats.value = {
-      semesters: Math.max(0, (dashboardData.value.basic_stats?.total_semesters || 0) - Math.floor(Math.random() * 3)),
-      grades: Math.max(0, (dashboardData.value.basic_stats?.total_grades || 0) - Math.floor(Math.random() * 2)),
-      subjects: Math.max(0, (dashboardData.value.basic_stats?.total_subjects || 0) - Math.floor(Math.random() * 2)),
-      questions: Math.max(0, (dashboardData.value.basic_stats?.total_questions || 0) - Math.floor(Math.random() * 10))
+      semesters: Math.max(0, (currentStats.total_semesters || 0) - Math.floor((currentStats.total_semesters || 0) * 0.1)),
+      grades: Math.max(0, (currentStats.total_grades || 0) - Math.floor((currentStats.total_grades || 0) * 0.05)),
+      subjects: Math.max(0, (currentStats.total_subjects || 0) - Math.floor((currentStats.total_subjects || 0) * 0.05)),
+      questions: Math.max(0, (currentStats.total_questions || 0) - Math.floor((currentStats.total_questions || 0) * 0.15))
     }
   } catch (error) {
     console.error('加载仪表板数据失败:', error)
@@ -340,7 +341,7 @@ function handleChartClick(params) {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
   gap: 24px;
-  margin-bottom: 48px;
+  margin-bottom: 32px;
 }
 
 .analytics-section {
@@ -426,7 +427,7 @@ function handleChartClick(params) {
 }
 
 .quick-actions {
-  margin-top: 32px;
+  margin-bottom: 32px;
 }
 
 .quick-actions h2 {

@@ -1,5 +1,5 @@
 from pydantic import BaseModel, EmailStr
-from typing import Optional
+from typing import Optional, List
 
 
 class Token(BaseModel):
@@ -42,6 +42,27 @@ class AdminResponse(BaseModel):
     avatar: Optional[str] = None
     is_active: bool
     is_superuser: bool
-    
+
+    class Config:
+        from_attributes = True
+
+
+class RoleInfo(BaseModel):
+    """角色信息"""
+    id: int
+    name: str
+    code: str
+    description: Optional[str] = None
+
+    class Config:
+        from_attributes = True
+
+
+class AdminPermissionsResponse(BaseModel):
+    """管理员权限响应"""
+    permissions: List[str]
+    roles: List[RoleInfo]
+    is_superuser: bool
+
     class Config:
         from_attributes = True

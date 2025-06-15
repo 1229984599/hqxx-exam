@@ -7,9 +7,12 @@ export const useAuthStore = defineStore('auth', () => {
   // 状态
   const token = ref(null)
   const user = ref(null)
+  const permissions = ref([])
+  const roles = ref([])
 
   // 计算属性
   const isAuthenticated = computed(() => !!token.value && tokenManager.isTokenValid(token.value))
+  const isSuperuser = computed(() => user.value?.is_superuser || false)
   
   // 方法
   async function login(credentials) {
@@ -33,15 +36,17 @@ export const useAuthStore = defineStore('auth', () => {
         throw new Error('服务器返回的令牌无效')
       }
 
-      // 设置token（pinia会自动持久化）
+      // 设置token（只通过pinia管理，移除重复设置）
       token.value = access_token
-      tokenManager.setToken(access_token)
 
       // 获取用户信息
       await fetchUser()
 
-      // 启动token定时检查
-      tokenManager.startPeriodicCheck(api)
+      // 获取用户权限
+      await fetchPermissions()
+
+      // 启动token定时检查（传入token获取函数）
+      tokenManager.startPeriodicCheck(api, () => token.value)
 
       return true
     } catch (error) {
@@ -80,18 +85,38 @@ export const useAuthStore = defineStore('auth', () => {
       throw error
     }
   }
+
+  async function fetchPermissions() {
+    try {
+      const response = await api.get('/auth/permissions')
+      permissions.value = response.data.permissions || []
+      roles.value = response.data.roles || []
+      console.log('✅ 权限信息已获取:', { permissions: permissions.value, roles: roles.value })
+    } catch (error) {
+      console.error('获取权限信息失败:', error)
+      permissions.value = []
+      roles.value = []
+
+      // 权限获取失败不影响登录状态，但需要记录错误
+      if (error.response?.status === 401) {
+        console.log('Token无效，自动登出')
+        logout()
+      }
+    }
+  }
   
   function logout() {
     token.value = null
     user.value = null
-    tokenManager.clearToken()
+    permissions.value = []
+    roles.value = []
     tokenManager.stopPeriodicCheck()
   }
 
   // 刷新token
   async function refreshToken() {
     try {
-      const newToken = await tokenManager.refreshToken(api)
+      const newToken = await tokenManager.refreshToken(api, token.value)
       token.value = newToken
       return newToken
     } catch (error) {
@@ -108,17 +133,59 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
+  // 基于角色的权限检查方法（RBAC核心）
+  function hasRole(roleCode) {
+    if (!roleCode) return true
+    if (isSuperuser.value) return true
+    return roles.value.some(role => role.code === roleCode)
+  }
+
+  function hasAnyRole(roleCodes) {
+    if (!roleCodes || roleCodes.length === 0) return true
+    if (isSuperuser.value) return true
+    return roleCodes.some(roleCode => hasRole(roleCode))
+  }
+
+  function hasAllRoles(roleCodes) {
+    if (!roleCodes || roleCodes.length === 0) return true
+    if (isSuperuser.value) return true
+    return roleCodes.every(roleCode => hasRole(roleCode))
+  }
+
+  // 基于权限的检查方法（细粒度权限控制）
+  function hasPermission(permission) {
+    if (!permission) return true
+    if (isSuperuser.value) return true
+    if (permissions.value.includes('*')) return true
+    return permissions.value.includes(permission)
+  }
+
+  function hasAnyPermission(permissionList) {
+    if (!permissionList || permissionList.length === 0) return true
+    if (isSuperuser.value) return true
+    if (permissions.value.includes('*')) return true
+    return permissionList.some(permission => permissions.value.includes(permission))
+  }
+
+  function hasAllPermissions(permissionList) {
+    if (!permissionList || permissionList.length === 0) return true
+    if (isSuperuser.value) return true
+    if (permissions.value.includes('*')) return true
+    return permissionList.every(permission => permissions.value.includes(permission))
+  }
+
   // 获取token信息
   function getTokenInfo() {
-    return tokenManager.getTokenInfo()
+    return tokenManager.getTokenInfo(token.value)
   }
-  
+
   // 初始化函数（由持久化插件的afterRestore调用）
   async function initialize() {
     if (token.value && tokenManager.isTokenValid(token.value)) {
       try {
         await fetchUser()
-        console.log('✅ 用户信息获取成功')
+        await fetchPermissions()
+        console.log('✅ 用户信息和权限获取成功')
       } catch (error) {
         console.log('❌ 获取用户信息失败，清理状态')
         logout()
@@ -127,36 +194,49 @@ export const useAuthStore = defineStore('auth', () => {
   }
   
   return {
+    // 状态
     token,
     user,
+    permissions,
+    roles,
+    // 计算属性
     isAuthenticated,
+    isSuperuser,
+    // 方法
     login,
     fetchUser,
+    fetchPermissions,
     logout,
     refreshToken,
     updateUser,
     getTokenInfo,
-    initialize
+    initialize,
+    // 角色检查方法（RBAC核心）
+    hasRole,
+    hasAnyRole,
+    hasAllRoles,
+    // 权限检查方法（细粒度控制）
+    hasPermission,
+    hasAnyPermission,
+    hasAllPermissions
   }
 }, {
   // 配置持久化
   persist: {
     key: 'auth-store',
     storage: localStorage,
-    paths: ['token', 'user'], // 只持久化token和user
+    paths: ['token', 'user', 'permissions', 'roles'], // 持久化认证和权限信息
     beforeRestore: (context) => {
       console.log('🔄 恢复认证状态...')
     },
     afterRestore: async (context) => {
       console.log('✅ 认证状态已恢复')
-      // 恢复后同步token到tokenManager
+      // 验证token有效性
       if (context.store.token) {
-        tokenManager.setToken(context.store.token)
-        // 验证token有效性
         if (tokenManager.isTokenValid(context.store.token)) {
           console.log('✅ Token有效，启动定时检查')
-          // 启动定时检查
-          tokenManager.startPeriodicCheck(api)
+          // 启动定时检查（传入token获取函数）
+          tokenManager.startPeriodicCheck(api, () => context.store.token)
           // 初始化用户信息
           await context.store.initialize()
         } else {
@@ -164,7 +244,8 @@ export const useAuthStore = defineStore('auth', () => {
           // token无效，清理状态
           context.store.token = null
           context.store.user = null
-          tokenManager.clearToken()
+          context.store.permissions = []
+          context.store.roles = []
         }
       }
     }

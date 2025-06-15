@@ -4,7 +4,7 @@
     <div class="filter-section" v-if="showFilters">
       <el-form :model="filters" inline>
         <!-- 添加按钮（可选） -->
-        <el-form-item v-if="showAddButton">
+        <el-form-item v-if="showAddButton && canCreate">
           <el-button
             type="primary"
             @click="showDialog = true"
@@ -53,13 +53,33 @@
       </el-form>
     </div>
 
-    <!-- 数据表格 -->
-    <el-table 
-      :data="data" 
-      v-loading="loading" 
-      class="modern-table"
-      v-bind="tableProps"
-    >
+    <!-- 批量操作 -->
+    <BatchOperationsGeneric
+      v-if="enableBatch && selectedItems.length > 0"
+      :selected-count="selectedItems.length"
+      :operations="batchOperations"
+      :enable-edit="enableBatchEdit"
+      :enable-copy="enableBatchCopy"
+      :edit-fields="batchEditFields"
+      :copy-fields="batchCopyFields"
+      @operation="handleBatchOperation"
+      @clear="clearSelection"
+      @batch-edit="handleBatchEdit"
+      @batch-copy="handleBatchCopy"
+    />
+
+    <!-- 表格容器 -->
+    <div class="table-wrapper">
+      <!-- 数据表格 -->
+      <el-table
+        :data="data"
+        v-loading="loading"
+        class="modern-table"
+        v-bind="tableProps"
+        @selection-change="handleSelectionChange"
+        height="100%"
+      >
+      <el-table-column v-if="enableBatch" type="selection" width="55" />
       <slot name="columns" />
       
       <!-- 操作列 -->
@@ -73,8 +93,14 @@
         <template #default="{ row }">
           <div class="action-buttons">
             <slot name="actions" :row="row" :edit="() => handleEdit(row)" :delete="() => handleDelete(row)">
-              <el-button size="small" @click="handleEdit(row)" :icon="Edit" />
               <el-button
+                v-if="canEdit"
+                size="small"
+                @click="handleEdit(row)"
+                :icon="Edit"
+              />
+              <el-button
+                v-if="canDelete"
                 size="small"
                 type="danger"
                 @click="handleDelete(row)"
@@ -85,6 +111,7 @@
         </template>
       </el-table-column>
     </el-table>
+    </div>
 
     <!-- 分页 -->
     <div class="pagination-section" v-if="showPagination">
@@ -105,6 +132,7 @@
       :title="editingId ? editTitle : addTitle"
       :width="dialogWidth"
       :before-close="handleDialogClose"
+      :append-to-body="true"
     >
       <slot name="form" :form="form" :rules="rules" :formRef="formRef" :isEdit="!!editingId">
         <el-form
@@ -131,6 +159,7 @@
 import { ref, reactive, computed, watch } from 'vue'
 import { Search, Refresh, Edit, Delete, Plus } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import BatchOperationsGeneric from './BatchOperationsGeneric.vue'
 
 const props = defineProps({
   // 数据相关
@@ -207,17 +236,60 @@ const props = defineProps({
   deleteConfirmField: {
     type: String,
     default: 'name'
+  },
+
+  // 权限控制
+  canCreate: {
+    type: Boolean,
+    default: true
+  },
+  canEdit: {
+    type: Boolean,
+    default: true
+  },
+  canDelete: {
+    type: Boolean,
+    default: true
+  },
+
+  // 批量操作
+  enableBatch: {
+    type: Boolean,
+    default: false
+  },
+  batchOperations: {
+    type: Array,
+    default: () => []
+  },
+  enableBatchEdit: {
+    type: Boolean,
+    default: false
+  },
+  enableBatchCopy: {
+    type: Boolean,
+    default: false
+  },
+  batchEditFields: {
+    type: Object,
+    default: () => ({})
+  },
+  batchCopyFields: {
+    type: Object,
+    default: () => ({})
   }
 })
 
 const emit = defineEmits([
   'search',
-  'reset-filters', 
+  'reset-filters',
   'edit',
   'delete',
   'submit',
   'size-change',
-  'current-change'
+  'current-change',
+  'batch-operation',
+  'batch-edit',
+  'batch-copy'
 ])
 
 // 响应式数据
@@ -225,6 +297,7 @@ const showDialog = ref(false)
 const editingId = ref(null)
 const submitting = ref(false)
 const formRef = ref()
+const selectedItems = ref([])
 
 const filters = reactive({
   search: '',
@@ -332,6 +405,27 @@ function handleCurrentChange(page) {
   emit('current-change', page)
 }
 
+// 批量操作相关方法
+function handleSelectionChange(selection) {
+  selectedItems.value = selection
+}
+
+function clearSelection() {
+  selectedItems.value = []
+}
+
+function handleBatchOperation(operation) {
+  emit('batch-operation', operation, selectedItems.value)
+}
+
+function handleBatchEdit(editData) {
+  emit('batch-edit', editData, selectedItems.value)
+}
+
+function handleBatchCopy(copyData) {
+  emit('batch-copy', copyData, selectedItems.value)
+}
+
 // 暴露方法给父组件
 defineExpose({
   showDialog: () => { showDialog.value = true },
@@ -345,6 +439,9 @@ defineExpose({
 <style scoped>
 .crud-table-container {
   width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
 }
 
 .filter-section {
@@ -354,13 +451,20 @@ defineExpose({
   padding: 20px;
   margin-bottom: 24px;
   border: 1px solid rgba(255, 255, 255, 0.3);
+  flex-shrink: 0;
+}
+
+.table-wrapper {
+  flex: 1;
+  overflow: hidden;
+  margin-bottom: 24px;
 }
 
 .modern-table {
   border-radius: 12px;
   overflow: hidden;
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
-  margin-bottom: 24px;
+  height: 100%;
 }
 
 .action-buttons {
@@ -377,6 +481,8 @@ defineExpose({
   backdrop-filter: blur(10px);
   border-radius: 12px;
   border: 1px solid rgba(255, 255, 255, 0.3);
+  flex-shrink: 0;
+  margin-top: auto;
 }
 
 :deep(.el-pagination) {

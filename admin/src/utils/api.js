@@ -12,46 +12,24 @@ const api = axios.create({
 
 // 请求拦截器
 api.interceptors.request.use(
-  async config => {
-    // 跳过登录和刷新token的请求，避免循环
-    const skipTokenCheck = config.url?.includes('/auth/login') ||
-                          config.url?.includes('/auth/refresh') ||
-                          config.url?.includes('/auth/register')
-
-    if (skipTokenCheck) {
-      // 对于刷新token请求，仍需要添加当前token
-      if (config.url?.includes('/auth/refresh')) {
-        const token = tokenManager.getToken()
+  config => {
+    // 从localStorage直接获取token（避免循环依赖）
+    try {
+      const authData = localStorage.getItem('auth-store')
+      if (authData) {
+        const parsedData = JSON.parse(authData)
+        const token = parsedData.token
         if (token) {
           config.headers.Authorization = `Bearer ${token}`
+          console.log('✅ Token已添加到请求头')
+        } else {
+          console.warn('⚠️ 未找到token')
         }
-      }
-      return config
-    }
-
-    // 对于其他需要认证的请求，检查并自动刷新token
-    try {
-      const isTokenValid = await tokenManager.checkAndRefreshToken(api)
-      if (!isTokenValid) {
-        // token无效且刷新失败，跳转到登录页
-        const currentPath = window.location.pathname
-        if (!currentPath.includes('/login')) {
-          ElMessage.error('登录已过期，请重新登录')
-          setTimeout(() => {
-            window.location.href = '/login'
-          }, 1500)
-        }
-        return Promise.reject(new Error('Token invalid'))
+      } else {
+        console.warn('⚠️ 未找到认证数据')
       }
     } catch (error) {
-      console.error('Token检查失败:', error)
-      // 继续执行请求，让响应拦截器处理错误
-    }
-
-    // 添加token到请求头
-    const token = tokenManager.getToken()
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`
+      console.error('❌ 获取token失败:', error)
     }
 
     return config
@@ -106,8 +84,7 @@ api.interceptors.response.use(
           if (!currentPath.includes('/login')) {
             ElMessage.error(data.detail)
             // 清除token并跳转到登录页
-            tokenManager.clearToken()
-            tokenManager.stopPeriodicCheck()
+            localStorage.removeItem('auth-store')
             setTimeout(() => {
               window.location.href = '/login'
             }, 1500)
@@ -115,8 +92,8 @@ api.interceptors.response.use(
         } else {
           if (!currentPath.includes('/login')) {
             ElMessage.error('登录已过期，请重新登录')
-            tokenManager.clearToken()
-            tokenManager.stopPeriodicCheck()
+            // 清除token并跳转到登录页
+            localStorage.removeItem('auth-store')
             setTimeout(() => {
               window.location.href = '/login'
             }, 1500)

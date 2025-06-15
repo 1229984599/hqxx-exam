@@ -26,6 +26,8 @@ export function toPinyinInitials(text) {
   }
 }
 
+
+
 /**
  * 生成分类代码
  * @param {string} name - 分类名称

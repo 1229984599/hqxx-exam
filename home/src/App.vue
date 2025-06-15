@@ -1,36 +1,36 @@
 <template>
-  <div id="app">
-    <AppHeader />
-    <main class="main-content">
-      <RouterView />
+  <div id="app" class="min-h-screen bg-gradient-to-br from-gray-50 to-blue-50">
+    <!-- Header组件 -->
+    <Header />
+
+    <!-- 主要内容区域 -->
+    <main class="container mx-auto px-4 py-6">
+      <router-view />
     </main>
+
+
+
+    <!-- 配置对话框 -->
+    <ConfigDialog />
   </div>
 </template>
 
 <script setup>
-import { RouterView } from 'vue-router'
-import AppHeader from './components/AppHeader.vue'
+import { onMounted } from 'vue'
+import Header from './components/Header.vue'
+import ConfigDialog from './components/ConfigDialog.vue'
+import { useConfigStore } from './stores/config'
+
+const configStore = useConfigStore()
+
+onMounted(async () => {
+  // 初始化时加载基础数据
+  await configStore.loadAllData()
+})
 </script>
 
 <style scoped>
 #app {
-  min-height: 100vh;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-}
-
-.main-content {
-  padding: 20px;
-  min-height: calc(100vh - 80px);
-}
-
-/* 全局样式重置 */
-* {
-  margin: 0;
-  padding: 0;
-  box-sizing: border-box;
-}
-
-body {
-  font-family: 'Helvetica Neue', Helvetica, 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', '微软雅黑', Arial, sans-serif;
+  font-family: 'Microsoft YaHei', 'PingFang SC', 'Hiragino Sans GB', sans-serif;
 }
 </style>

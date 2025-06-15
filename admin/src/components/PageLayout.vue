@@ -1,7 +1,24 @@
 <template>
   <div class="page-layout">
+    <!-- 页面头部 -->
+    <div class="page-header">
+      <div class="header-left">
+        <h1 class="page-title">{{ title }}</h1>
+        <p v-if="subtitle" class="page-subtitle">{{ subtitle }}</p>
+      </div>
+      <div class="header-right">
+        <slot name="actions"></slot>
+      </div>
+    </div>
+
+    <!-- 页面内容 -->
     <div class="page-content">
       <slot></slot>
+    </div>
+
+    <!-- 页面底部（分页等） -->
+    <div v-if="$slots.footer" class="page-footer">
+      <slot name="footer"></slot>
     </div>
   </div>
 </template>

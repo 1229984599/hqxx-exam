@@ -53,9 +53,9 @@
       <div class="logs-header">
         <div class="logs-stats">
           <el-tag type="info">总计: {{ totalLogs }}</el-tag>
-          <el-tag type="success">信息: {{ logStats.info || 0 }}</el-tag>
-          <el-tag type="warning">警告: {{ logStats.warning || 0 }}</el-tag>
-          <el-tag type="danger">错误: {{ logStats.error || 0 }}</el-tag>
+          <el-tag type="success">信息: {{ logStats.info_count || 0 }}</el-tag>
+          <el-tag type="warning">警告: {{ logStats.warning_count || 0 }}</el-tag>
+          <el-tag type="danger">错误: {{ logStats.error_count || 0 }}</el-tag>
         </div>
         
         <div class="logs-actions">
@@ -175,8 +175,8 @@ async function loadLogs() {
       params.end_time = filters.dateRange[1]
     }
     
-    // 模拟API调用 - 实际项目中应该调用真实API
-    const response = await mockGetLogs(params)
+    // 调用真实API
+    const response = await api.get('/system/logs', { params })
     
     logs.value = response.data.logs
     totalLogs.value = response.data.total
@@ -189,64 +189,7 @@ async function loadLogs() {
   }
 }
 
-// 模拟日志API - 实际项目中应该替换为真实API
-async function mockGetLogs(params) {
-  // 模拟延迟
-  await new Promise(resolve => setTimeout(resolve, 500))
-  
-  // 模拟日志数据
-  const mockLogs = [
-    {
-      id: 1,
-      level: 'info',
-      module: 'auth',
-      message: '用户登录成功',
-      details: { ip: '192.168.1.100', user_agent: 'Mozilla/5.0...' },
-      user: 'admin',
-      timestamp: new Date(Date.now() - 1000 * 60 * 5).toISOString()
-    },
-    {
-      id: 2,
-      level: 'warning',
-      module: 'questions',
-      message: '试题批量操作执行时间较长',
-      details: { duration: '5.2s', count: 150 },
-      user: 'admin',
-      timestamp: new Date(Date.now() - 1000 * 60 * 15).toISOString()
-    },
-    {
-      id: 3,
-      level: 'error',
-      module: 'upload',
-      message: '图片上传失败',
-      details: { error: 'CDN连接超时', file: 'image.jpg' },
-      user: 'admin',
-      timestamp: new Date(Date.now() - 1000 * 60 * 30).toISOString()
-    },
-    {
-      id: 4,
-      level: 'info',
-      module: 'system',
-      message: '系统备份完成',
-      details: { size: '15.6MB', duration: '2.1s' },
-      user: 'system',
-      timestamp: new Date(Date.now() - 1000 * 60 * 60).toISOString()
-    }
-  ]
-  
-  return {
-    data: {
-      logs: mockLogs,
-      total: mockLogs.length,
-      stats: {
-        info: 2,
-        warning: 1,
-        error: 1,
-        debug: 0
-      }
-    }
-  }
-}
+// 这个函数已经不再使用，所有日志都通过真实API获取
 
 function getLogClass(level) {
   return `log-${level}`

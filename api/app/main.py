@@ -2,7 +2,8 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from tortoise.contrib.fastapi import register_tortoise
 from app.config import settings, TORTOISE_ORM
-from app.routers import auth, semesters, grades, subjects, categories, questions, templates, upload, analytics, system, search
+from app.routers import auth, semesters, grades, subjects, categories, questions, templates, upload, analytics, system, search, roles, public
+from app.middleware.performance import PerformanceMiddleware
 
 # 创建FastAPI应用
 app = FastAPI(
@@ -11,6 +12,9 @@ app = FastAPI(
     version="1.0.0",
     openapi_url=f"{settings.API_V1_STR}/openapi.json"
 )
+
+# 添加性能监控中间件
+app.add_middleware(PerformanceMiddleware)
 
 # 设置CORS
 if settings.BACKEND_CORS_ORIGINS:
@@ -34,6 +38,9 @@ app.include_router(upload.router, prefix=settings.API_V1_STR)
 app.include_router(analytics.router, prefix=settings.API_V1_STR)
 app.include_router(system.router, prefix=settings.API_V1_STR)
 app.include_router(search.router, prefix=settings.API_V1_STR)
+app.include_router(roles.router, prefix=settings.API_V1_STR)
+# 公开API路由（无需认证）
+app.include_router(public.router, prefix=settings.API_V1_STR)
 
 # 注册Tortoise ORM
 register_tortoise(

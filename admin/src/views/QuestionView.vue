@@ -5,6 +5,7 @@
   >
     <template #actions>
       <el-button
+        v-permission="'questions:create'"
         type="primary"
         @click="$router.push('/questions/add')"
         :icon="Plus"
@@ -169,8 +170,14 @@
       <el-table-column label="操作" align="center" width="160" fixed="right">
         <template #default="{ row }">
           <div class="action-buttons">
-            <el-button size="small" @click="$router.push(`/questions/edit/${row.id}`)" :icon="Edit" />
             <el-button
+              v-permission="'questions:edit'"
+              size="small"
+              @click="$router.push(`/questions/edit/${row.id}`)"
+              :icon="Edit"
+            />
+            <el-button
+              v-permission="'questions:delete'"
               size="small"
               type="danger"
               @click="deleteQuestion(row)"
@@ -202,8 +209,11 @@ import { Plus, Edit, Delete, Search, Refresh } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import api from '../utils/api'
 import { getDifficultyText, getDifficultyType, getQuestionTypeText } from '../composables/useCrud'
+import { usePermissions } from '../composables/usePermissions'
 import PageLayout from '../components/PageLayout.vue'
 import BatchOperations from '../components/BatchOperations.vue'
+
+const { hasRole, hasAnyRole, isAdmin, isTeacher, isSubjectAdmin } = usePermissions()
 
 const loading = ref(false)
 
@@ -238,12 +248,14 @@ async function loadBasicData() {
       api.get('/grades/'),
       api.get('/subjects/')
     ])
-    
+
     semesters.value = semestersRes.data
     grades.value = gradesRes.data
     subjects.value = subjectsRes.data
   } catch (error) {
-    ElMessage.error('加载基础数据失败')
+    console.error('加载基础数据失败:', error)
+    const errorMessage = error.response?.data?.detail || error.message || '加载基础数据失败'
+    ElMessage.error(errorMessage)
   }
 }
 
@@ -254,7 +266,7 @@ async function loadQuestions() {
       page: pagination.page,
       size: pagination.size
     }
-    
+
     // 添加筛选条件
     if (filters.semester_id) params.semester_id = filters.semester_id
     if (filters.grade_id) params.grade_id = filters.grade_id
@@ -262,7 +274,7 @@ async function loadQuestions() {
     if (filters.search) params.search = filters.search
 
     const response = await api.get('/questions/', { params })
-    
+
     if (response.data.results) {
       questions.value = response.data.results
       pagination.total = response.data.total
@@ -270,8 +282,29 @@ async function loadQuestions() {
       questions.value = response.data
       pagination.total = response.data.length
     }
+
+    // 如果没有数据，显示友好提示
+    if (questions.value.length === 0 && pagination.page === 1) {
+      if (Object.values(filters).some(v => v)) {
+        ElMessage.info('没有找到符合条件的试题，请调整筛选条件')
+      } else {
+        ElMessage.info('暂无试题数据，点击"添加试题"开始创建')
+      }
+    }
   } catch (error) {
-    ElMessage.error('加载试题列表失败')
+    console.error('加载试题列表失败:', error)
+    const errorMessage = error.response?.data?.detail || error.message || '加载试题列表失败'
+    ElMessage.error(errorMessage)
+
+    // 网络错误时显示重试按钮
+    if (error.code === 'NETWORK_ERROR') {
+      ElMessage({
+        message: '网络连接失败，请检查网络后重试',
+        type: 'error',
+        showClose: true,
+        duration: 0
+      })
+    }
   } finally {
     loading.value = false
   }
@@ -279,18 +312,43 @@ async function loadQuestions() {
 
 async function deleteQuestion(question) {
   try {
-    await ElMessageBox.confirm(`确定要删除试题"${question.title}"吗？`, '提示', {
-      confirmButtonText: '确定',
-      cancelButtonText: '取消',
-      type: 'warning'
+    await ElMessageBox.confirm(
+      `确定要删除试题"${question.title}"吗？此操作不可恢复。`,
+      '删除确认',
+      {
+        confirmButtonText: '确认删除',
+        cancelButtonText: '取消',
+        type: 'warning',
+        dangerouslyUseHTMLString: false
+      }
+    )
+
+    const deleteLoading = ElMessage({
+      message: '正在删除试题...',
+      type: 'info',
+      duration: 0
     })
 
-    await api.delete(`/questions/${question.id}`)
-    ElMessage.success('删除成功')
-    loadQuestions()
+    try {
+      await api.delete(`/questions/${question.id}`)
+      deleteLoading.close()
+      ElMessage.success('试题删除成功')
+
+      // 如果当前页没有数据了，回到上一页
+      if (questions.value.length === 1 && pagination.page > 1) {
+        pagination.page--
+      }
+
+      loadQuestions()
+    } catch (deleteError) {
+      deleteLoading.close()
+      console.error('删除试题失败:', deleteError)
+      const errorMessage = deleteError.response?.data?.detail || deleteError.message || '删除试题失败'
+      ElMessage.error(errorMessage)
+    }
   } catch (error) {
     if (error !== 'cancel') {
-      ElMessage.error('删除失败')
+      console.error('删除操作异常:', error)
     }
   }
 }

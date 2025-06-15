@@ -29,6 +29,67 @@ class MessageResponse(BaseModel):
     message: str
 
 
+# 批量操作相关Schema
+class BatchUpdateRequest(BaseModel):
+    ids: Optional[List[int]] = None
+    semester_ids: Optional[List[int]] = None
+    grade_ids: Optional[List[int]] = None
+    subject_ids: Optional[List[int]] = None
+    category_ids: Optional[List[int]] = None
+    admin_ids: Optional[List[int]] = None
+    update_data: dict
+
+    def get_ids(self) -> List[int]:
+        """获取实际的ID列表"""
+        for field_name in ['ids', 'semester_ids', 'grade_ids', 'subject_ids', 'category_ids', 'admin_ids']:
+            ids = getattr(self, field_name, None)
+            if ids:
+                return ids
+        return []
+
+
+class BatchDeleteRequest(BaseModel):
+    ids: Optional[List[int]] = None
+    semester_ids: Optional[List[int]] = None
+    grade_ids: Optional[List[int]] = None
+    subject_ids: Optional[List[int]] = None
+    category_ids: Optional[List[int]] = None
+    admin_ids: Optional[List[int]] = None
+
+    def get_ids(self) -> List[int]:
+        """获取实际的ID列表"""
+        for field_name in ['ids', 'semester_ids', 'grade_ids', 'subject_ids', 'category_ids', 'admin_ids']:
+            ids = getattr(self, field_name, None)
+            if ids:
+                return ids
+        return []
+
+
+class BatchCopyRequest(BaseModel):
+    ids: Optional[List[int]] = None
+    semester_ids: Optional[List[int]] = None
+    grade_ids: Optional[List[int]] = None
+    subject_ids: Optional[List[int]] = None
+    category_ids: Optional[List[int]] = None
+    copy_data: dict
+
+    def get_ids(self) -> List[int]:
+        """获取实际的ID列表"""
+        for field_name in ['ids', 'semester_ids', 'grade_ids', 'subject_ids', 'category_ids']:
+            ids = getattr(self, field_name, None)
+            if ids:
+                return ids
+        return []
+
+
+class BatchOperationResponse(BaseModel):
+    success_count: int
+    failed_count: int = 0
+    total_count: int
+    message: str
+    failed_items: List[dict] = []
+
+
 class SemesterBase(BaseModel):
     name: str
     code: str
@@ -253,45 +314,7 @@ class TemplateResponse(BaseResponse):
     subject: Optional[SubjectResponse] = None
 
 
-# 模板相关Schema
-class TemplateBase(BaseModel):
-    name: str
-    description: Optional[str] = None
-    content: str
-    category: str
-    icon: Optional[str] = None
-    subject_id: Optional[int] = None
-    is_active: bool = True
-    sort_order: int = 0
 
-
-class TemplateCreate(TemplateBase):
-    pass
-
-
-class TemplateUpdate(BaseModel):
-    name: Optional[str] = None
-    description: Optional[str] = None
-    content: Optional[str] = None
-    category: Optional[str] = None
-    icon: Optional[str] = None
-    subject_id: Optional[int] = None
-    is_active: Optional[bool] = None
-    sort_order: Optional[int] = None
-
-
-class TemplateResponse(BaseResponse):
-    name: str
-    description: Optional[str] = None
-    content: str
-    category: str
-    icon: Optional[str] = None
-    subject_id: Optional[int] = None
-    is_active: bool = True
-    is_system: bool = False
-    sort_order: int = 0
-    usage_count: int = 0
-    subject: Optional[SubjectResponse] = None
 
 
 # 解决循环引用

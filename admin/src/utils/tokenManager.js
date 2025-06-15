@@ -7,35 +7,17 @@ import { ElMessage } from 'element-plus'
 
 class TokenManager {
   constructor() {
-    this.tokenKey = 'admin_token'
     this.refreshPromise = null // 防止并发刷新
     this.isRefreshing = false
     this.refreshThreshold = 5 * 60 * 1000 // 5分钟（毫秒）
+    this.getTokenCallback = null // token获取回调函数
   }
 
   /**
-   * 获取token
+   * 获取token（通过回调函数）
    */
   getToken() {
-    return localStorage.getItem(this.tokenKey)
-  }
-
-  /**
-   * 设置token
-   */
-  setToken(token) {
-    if (token) {
-      localStorage.setItem(this.tokenKey, token)
-    } else {
-      localStorage.removeItem(this.tokenKey)
-    }
-  }
-
-  /**
-   * 清除token
-   */
-  clearToken() {
-    localStorage.removeItem(this.tokenKey)
+    return this.getTokenCallback ? this.getTokenCallback() : null
   }
 
   /**
@@ -45,7 +27,7 @@ class TokenManager {
     try {
       if (!token) return null
       
-      const parts = token.split('.')
+      const parts = (token || '').split('.')
       if (parts.length !== 3) return null
       
       const payload = parts[1]
@@ -116,14 +98,14 @@ class TokenManager {
   /**
    * 刷新token
    */
-  async refreshToken(api) {
+  async refreshToken(api, currentToken) {
     // 防止并发刷新
     if (this.isRefreshing && this.refreshPromise) {
       return this.refreshPromise
     }
 
     this.isRefreshing = true
-    this.refreshPromise = this._doRefreshToken(api)
+    this.refreshPromise = this._doRefreshToken(api, currentToken)
 
     try {
       const result = await this.refreshPromise
@@ -137,10 +119,10 @@ class TokenManager {
   /**
    * 执行token刷新
    */
-  async _doRefreshToken(api) {
+  async _doRefreshToken(api, currentToken) {
     try {
       console.log('🔄 开始刷新token...')
-      
+
       const response = await api.post('/auth/refresh')
       const { access_token } = response.data
 
@@ -148,17 +130,11 @@ class TokenManager {
         throw new Error('服务器返回的新token无效')
       }
 
-      // 更新token
-      this.setToken(access_token)
       console.log('✅ Token刷新成功')
-
       return access_token
     } catch (error) {
       console.error('❌ Token刷新失败:', error)
-      
-      // 刷新失败，清除token
-      this.clearToken()
-      
+
       // 根据错误类型给出不同提示
       if (error.response?.status === 401) {
         ElMessage.error('登录已过期，请重新登录')
@@ -176,7 +152,7 @@ class TokenManager {
           window.location.href = '/login'
         }, 1500)
       }
-      
+
       throw error
     }
   }
@@ -184,24 +160,22 @@ class TokenManager {
   /**
    * 检查并自动刷新token
    */
-  async checkAndRefreshToken(api) {
-    const token = this.getToken()
-    if (!token) {
+  async checkAndRefreshToken(api, currentToken) {
+    if (!currentToken) {
       return false
     }
 
     // 如果token无效，直接返回false
-    if (!this.isTokenValid(token)) {
+    if (!this.isTokenValid(currentToken)) {
       console.log('Token已过期，需要重新登录')
-      this.clearToken()
       return false
     }
 
     // 如果token即将过期，尝试刷新
-    if (this.isTokenExpiringSoon(token)) {
+    if (this.isTokenExpiringSoon(currentToken)) {
       try {
-        await this.refreshToken(api)
-        return true
+        const newToken = await this.refreshToken(api, currentToken)
+        return newToken
       } catch (error) {
         return false
       }
@@ -213,14 +187,24 @@ class TokenManager {
   /**
    * 启动定时检查
    */
-  startPeriodicCheck(api, intervalMs = 60000) { // 默认每分钟检查一次
+  startPeriodicCheck(api, getTokenCallback, intervalMs = 60000) { // 默认每分钟检查一次
     if (this.checkInterval) {
       clearInterval(this.checkInterval)
     }
 
+    // 保存token获取回调
+    this.getTokenCallback = getTokenCallback
+
     this.checkInterval = setInterval(async () => {
       try {
-        await this.checkAndRefreshToken(api)
+        const currentToken = getTokenCallback()
+        const result = await this.checkAndRefreshToken(api, currentToken)
+
+        // 如果返回了新token，需要通知外部更新
+        if (typeof result === 'string') {
+          console.log('Token已刷新，需要外部更新')
+          // 这里可以通过事件或回调通知外部更新token
+        }
       } catch (error) {
         console.error('定时token检查失败:', error)
       }

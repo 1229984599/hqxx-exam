@@ -237,7 +237,7 @@ async function performSearch() {
   loading.value = true
   try {
     const params = {
-      q: searchQuery.value.trim(),
+      q: (searchQuery.value || '').trim(),
       limit: 50
     }
     
@@ -251,7 +251,7 @@ async function performSearch() {
     // 更新URL
     router.replace({
       query: {
-        q: searchQuery.value.trim(),
+        q: (searchQuery.value || '').trim(),
         ...(activeTab.value !== 'all' && { type: activeTab.value })
       }
     })
@@ -281,7 +281,7 @@ function getTabCount(tabKey) {
 function highlightText(text) {
   if (!searchQuery.value.trim() || !text) return text
   
-  const query = searchQuery.value.trim()
+  const query = (searchQuery.value || '').trim()
   const regex = new RegExp(`(${query})`, 'gi')
   return text.replace(regex, '<mark>$1</mark>')
 }

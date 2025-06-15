@@ -1,39 +1,33 @@
 <template>
   <div class="batch-operations">
-    <div class="batch-header">
-      <div class="selection-info">
-        <el-checkbox 
-          v-model="selectAll" 
-          :indeterminate="isIndeterminate"
-          @change="handleSelectAll"
-        >
-          全选
-        </el-checkbox>
-        <span class="selected-count" v-if="selectedItems.length > 0">
+    <div class="batch-header" v-show="selectedItems.length > 0">
+      <span class="selected-count" >
           已选择 {{ selectedItems.length }} 项
         </span>
-      </div>
       
-      <div class="batch-actions" v-if="selectedItems.length > 0">
+      <div class="batch-actions">
         <el-button-group>
-          <el-button 
-            size="small" 
+          <el-button
+            v-if="canEdit"
+            size="small"
             @click="showBatchUpdateDialog = true"
             :icon="Edit"
           >
             批量编辑
           </el-button>
-          
-          <el-button 
-            size="small" 
+
+          <el-button
+            v-if="canCreate"
+            size="small"
             @click="showBatchCopyDialog = true"
             :icon="CopyDocument"
           >
             批量复制
           </el-button>
-          
-          <el-button 
-            size="small" 
+
+          <el-button
+            v-if="canDelete"
+            size="small"
             type="danger"
             @click="handleBatchDelete"
             :icon="Delete"
@@ -197,6 +191,7 @@ import { ref, computed, watch, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Edit, CopyDocument, Delete } from '@element-plus/icons-vue'
 import api from '../utils/api'
+import { usePermissions } from '../composables/usePermissions'
 
 const props = defineProps({
   items: {
@@ -210,6 +205,9 @@ const props = defineProps({
 })
 
 const emit = defineEmits(['update:selectedItems', 'refresh'])
+
+// 权限检查
+const { hasPermission } = usePermissions()
 
 // 响应式数据
 const selectAll = ref(false)
@@ -256,6 +254,11 @@ const copyFilteredCategories = computed(() => {
   if (!batchCopyForm.value.target_subject_id) return categories.value
   return categories.value.filter(cat => cat.subject_id === batchCopyForm.value.target_subject_id)
 })
+
+// 权限计算属性
+const canEdit = computed(() => hasPermission('questions:edit'))
+const canCreate = computed(() => hasPermission('questions:create'))
+const canDelete = computed(() => hasPermission('questions:delete'))
 
 // 生命周期
 onMounted(async () => {

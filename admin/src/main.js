@@ -8,6 +8,7 @@ import * as ElementPlusIconsVue from '@element-plus/icons-vue'
 import App from './App.vue'
 import router from './router'
 import './styles/global.css'
+import { permissionDirective, roleDirective } from './composables/usePermissions'
 
 const app = createApp(App)
 const pinia = createPinia()
@@ -19,9 +20,21 @@ pinia.use(piniaPluginPersistedstate)
 for (const [key, component] of Object.entries(ElementPlusIconsVue)) {
   app.component(key, component)
 }
-
+// 开发环境下引入调试工具
+if (import.meta.env.DEV) {
+  import('./utils/permissionTest.js')
+  import('./utils/permissionSystemTest.js')
+  import('./utils/finalPermissionValidation.js')
+  // import('./utils/tokenDebug.js')
+}
 app.use(pinia)
 app.use(router)
 app.use(ElementPlus)
+
+// 注册权限和角色指令
+app.directive('permission', permissionDirective)
+app.directive('role', roleDirective)
+
+
 
 app.mount('#app')

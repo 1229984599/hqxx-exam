@@ -11,6 +11,8 @@ from app.schemas.common import (
     MessageResponse
 )
 from app.dependencies.auth import get_current_active_admin
+from app.utils.permissions import PermissionManager
+from app.models.role import PermissionCode, RoleCode
 from pydantic import BaseModel
 
 router = APIRouter(prefix="/questions", tags=["试题管理"])
@@ -28,9 +30,13 @@ async def get_questions(
     question_type: str = Query(None, description="题目类型"),
     search: str = Query(None, description="搜索关键词"),
     skip: int = Query(0, ge=0, description="跳过数量"),
-    limit: int = Query(20, ge=1, le=100, description="限制数量")
+    limit: int = Query(20, ge=1, le=100, description="限制数量"),
+    current_admin = Depends(get_current_active_admin)
 ):
     """获取试题列表"""
+    # 检查角色：教师及以上角色可以查看试题
+    if not current_admin.is_superuser and not await PermissionManager.has_any_role(current_admin, [RoleCode.SUPER_ADMIN, RoleCode.ADMIN, RoleCode.TEACHER, RoleCode.SUBJECT_ADMIN]):
+        raise HTTPException(status_code=403, detail="Role required: teacher or above")
     query = Question.all().prefetch_related("semester", "grade", "subject", "category")
 
     if semester_id is not None:
@@ -192,8 +198,14 @@ async def get_random_question(
 
 
 @router.get("/{question_id}", summary="获取试题详情")
-async def get_question(question_id: int):
+async def get_question(
+    question_id: int,
+    current_admin = Depends(get_current_active_admin)
+):
     """获取试题详情"""
+    # 检查权限
+    if not current_admin.is_superuser and not await PermissionManager.has_permission(current_admin, PermissionCode.QUESTIONS_VIEW):
+        raise HTTPException(status_code=403, detail="Permission denied")
     question = await Question.filter(id=question_id).prefetch_related(
         "semester", "grade", "subject", "category"
     ).first()
@@ -253,6 +265,9 @@ async def create_question(
     current_admin = Depends(get_current_active_admin)
 ):
     """创建试题"""
+    # 检查权限
+    if not current_admin.is_superuser and not await PermissionManager.has_permission(current_admin, PermissionCode.QUESTIONS_CREATE):
+        raise HTTPException(status_code=403, detail="Permission denied")
     # 验证关联数据是否存在
     semester = await Semester.filter(id=question_data.semester_id).first()
     if not semester:
@@ -339,11 +354,15 @@ async def update_question(
     current_admin = Depends(get_current_active_admin)
 ):
     """更新试题"""
+    # 检查权限
+    if not current_admin.is_superuser and not await PermissionManager.has_permission(current_admin, PermissionCode.QUESTIONS_EDIT):
+        raise HTTPException(status_code=403, detail="Permission denied")
+
     question = await Question.filter(id=question_id).first()
     if not question:
         raise HTTPException(status_code=404, detail="Question not found")
 
-    update_data = question_data.dict(exclude_unset=True)
+    update_data = question_data.model_dump(exclude_unset=True)
 
     # 验证并设置关联数据（如果要更新）
     if question_data.semester_id:
@@ -432,6 +451,10 @@ async def delete_question(
     current_admin = Depends(get_current_active_admin)
 ):
     """删除试题"""
+    # 检查权限
+    if not current_admin.is_superuser and not await PermissionManager.has_permission(current_admin, PermissionCode.QUESTIONS_DELETE):
+        raise HTTPException(status_code=403, detail="Permission denied")
+
     question = await Question.filter(id=question_id).first()
     if not question:
         raise HTTPException(status_code=404, detail="Question not found")
@@ -464,6 +487,10 @@ async def batch_update_questions(
     current_admin = Depends(get_current_active_admin)
 ):
     """批量更新试题"""
+    # 检查权限
+    if not current_admin.is_superuser and not await PermissionManager.has_permission(current_admin, PermissionCode.QUESTIONS_EDIT):
+        raise HTTPException(status_code=403, detail="Permission denied")
+
     if not request.question_ids:
         raise HTTPException(status_code=400, detail="No question IDs provided")
 
@@ -510,6 +537,10 @@ async def batch_delete_questions(
     current_admin = Depends(get_current_active_admin)
 ):
     """批量删除试题"""
+    # 检查权限
+    if not current_admin.is_superuser and not await PermissionManager.has_permission(current_admin, PermissionCode.QUESTIONS_DELETE):
+        raise HTTPException(status_code=403, detail="Permission denied")
+
     if not request.question_ids:
         raise HTTPException(status_code=400, detail="No question IDs provided")
 
@@ -533,6 +564,10 @@ async def batch_copy_questions(
     current_admin = Depends(get_current_active_admin)
 ):
     """批量复制试题"""
+    # 检查权限
+    if not current_admin.is_superuser and not await PermissionManager.has_permission(current_admin, PermissionCode.QUESTIONS_CREATE):
+        raise HTTPException(status_code=403, detail="Permission denied")
+
     if not request.question_ids:
         raise HTTPException(status_code=400, detail="No question IDs provided")
 

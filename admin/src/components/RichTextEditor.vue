@@ -242,7 +242,10 @@ function setFontSize(size) {
 
 // 设置文本对齐
 function setTextAlign(align) {
-  document.execCommand('justify' + align.charAt(0).toUpperCase() + align.slice(1), false, null)
+  if (!align || typeof align !== 'string') return
+
+  const command = 'justify' + align.charAt(0).toUpperCase() + align.slice(1)
+  document.execCommand(command, false, null)
   handleInput()
 }
 

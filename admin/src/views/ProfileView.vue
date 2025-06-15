@@ -9,7 +9,7 @@
         <div class="profile-header">
           <div class="avatar-section">
             <el-avatar :size="80" class="profile-avatar">
-              {{ authStore.user?.username?.charAt(0)?.toUpperCase() }}
+              {{ authStore.user?.username?.charAt(0)?.toUpperCase() || 'U' }}
             </el-avatar>
             <div class="avatar-actions">
               <el-button size="small" type="primary" @click="showAvatarDialog = true">
@@ -308,16 +308,19 @@ function loadUserProfile() {
 
 async function loadUserStats() {
   try {
-    // 这里可以调用API获取用户统计数据
-    // const response = await api.get('/auth/profile/stats')
-    // userStats = response.data
-    
-    // 模拟数据
-    userStats.created_questions = 15
-    userStats.last_login_days = 1
-    userStats.total_login_count = 42
+    // 调用真实API获取用户统计数据
+    const response = await api.get('/auth/profile/stats')
+    if (response.data) {
+      userStats.created_questions = response.data.created_questions || 0
+      userStats.last_login_days = response.data.last_login_days || 0
+      userStats.total_login_count = response.data.total_login_count || 0
+    }
   } catch (error) {
     console.error('加载用户统计失败:', error)
+    // 如果API调用失败，使用默认值
+    userStats.created_questions = 0
+    userStats.last_login_days = 0
+    userStats.total_login_count = 0
   }
 }
 

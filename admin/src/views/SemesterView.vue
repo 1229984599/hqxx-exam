@@ -14,11 +14,23 @@
       delete-confirm-field="name"
       show-add-button
       add-button-text="添加学期"
+      :can-create="canManageBasicData"
+      :can-edit="canManageBasicData"
+      :can-delete="canManageBasicData"
+      :enable-batch="true"
+      :enable-batch-edit="true"
+      :enable-batch-copy="true"
+      :batch-operations="batchOperations"
+      :batch-edit-fields="batchEditFields"
+      :batch-copy-fields="batchCopyFields"
       @search="crud.handleSearch"
       @reset-filters="crud.resetFilters"
       @edit="crud.handleEdit"
       @delete="handleDelete"
       @submit="crud.handleSubmit"
+      @batch-operation="handleBatchOperation"
+      @batch-edit="handleBatchEdit"
+      @batch-copy="handleBatchCopy"
     >
       <template #columns>
         <el-table-column prop="name" label="学期名称" min-width="200">
@@ -78,15 +90,100 @@
           />
         </el-form-item>
       </template>
+
+      <!-- 批量编辑表单 -->
+      <template #batch-edit-form="{ form }">
+        <el-form-item label="状态">
+          <el-select v-model="form.is_active" placeholder="选择状态" clearable>
+            <el-option label="启用" :value="true" />
+            <el-option label="禁用" :value="false" />
+          </el-select>
+        </el-form-item>
+
+        <el-form-item label="排序">
+          <el-input-number v-model="form.sort_order" :min="0" placeholder="设置排序" />
+        </el-form-item>
+
+        <el-form-item label="描述">
+          <el-input
+            v-model="form.description"
+            type="textarea"
+            :rows="3"
+            placeholder="批量更新描述"
+          />
+        </el-form-item>
+      </template>
+
+      <!-- 批量复制表单 -->
+      <template #batch-copy-form="{ form }">
+        <el-form-item label="复制数量">
+          <el-input-number v-model="form.copy_count" :min="1" :max="10" />
+        </el-form-item>
+
+        <el-form-item label="名称后缀">
+          <el-input v-model="form.name_suffix" placeholder="例如：_副本" />
+        </el-form-item>
+      </template>
     </CrudTable>
   </PageLayout>
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
+import { ElMessage } from 'element-plus'
 import { useCrud, commonRules, formatDate } from '../composables/useCrud'
+import { usePermissions } from '../composables/usePermissions'
 import CrudTable from '../components/CrudTable.vue'
 import PageLayout from '../components/PageLayout.vue'
+import api from '../utils/api'
+
+const { hasPermission } = usePermissions()
+
+// 权限检查
+const canManageBasicData = computed(() =>
+  hasPermission('basic_data:edit')
+)
+
+// 批量操作配置
+const batchOperations = [
+  {
+    key: 'activate',
+    label: '批量激活',
+    type: 'success',
+    icon: 'Check',
+    confirm: true,
+    confirmText: '确定要激活选中的学期吗？'
+  },
+  {
+    key: 'deactivate',
+    label: '批量禁用',
+    type: 'warning',
+    icon: 'Close',
+    confirm: true,
+    confirmText: '确定要禁用选中的学期吗？'
+  },
+  {
+    key: 'delete',
+    label: '批量删除',
+    type: 'danger',
+    icon: 'Delete',
+    confirm: true,
+    confirmText: '确定要删除选中的学期吗？此操作不可恢复！'
+  }
+]
+
+// 批量编辑字段配置
+const batchEditFields = {
+  is_active: null,
+  sort_order: null,
+  description: ''
+}
+
+// 批量复制字段配置
+const batchCopyFields = {
+  copy_count: 1,
+  name_suffix: '_副本'
+}
 
 // 使用CRUD Composable
 const crud = useCrud('/semesters/', {
@@ -120,6 +217,91 @@ const crudTable = ref()
 // 处理删除
 async function handleDelete(row) {
   await crud.deleteData(row.id)
+}
+
+// 批量操作处理
+async function handleBatchOperation(operation, selectedItems) {
+  if (selectedItems.length === 0) {
+    ElMessage.warning('请先选择要操作的学期')
+    return
+  }
+
+  try {
+    const itemIds = selectedItems.map(item => item.id)
+
+    switch (operation.key) {
+      case 'activate':
+        await api.post('/semesters/batch-update', {
+          semester_ids: itemIds,
+          update_data: { is_active: true }
+        })
+        ElMessage.success(`成功激活 ${itemIds.length} 个学期`)
+        break
+      case 'deactivate':
+        await api.post('/semesters/batch-update', {
+          semester_ids: itemIds,
+          update_data: { is_active: false }
+        })
+        ElMessage.success(`成功禁用 ${itemIds.length} 个学期`)
+        break
+      case 'delete':
+        await api.post('/semesters/batch-delete', { semester_ids: itemIds })
+        ElMessage.success(`成功删除 ${itemIds.length} 个学期`)
+        break
+    }
+
+    await crud.loadData()
+  } catch (error) {
+    console.error('批量操作失败:', error)
+    ElMessage.error('批量操作失败')
+  }
+}
+
+// 批量编辑处理
+async function handleBatchEdit(editData, selectedItems) {
+  if (selectedItems.length === 0) {
+    ElMessage.warning('请先选择要编辑的学期')
+    return
+  }
+
+  try {
+    const itemIds = selectedItems.map(item => item.id)
+
+    await api.post('/semesters/batch-update', {
+      semester_ids: itemIds,
+      update_data: editData
+    })
+
+    ElMessage.success(`成功编辑 ${itemIds.length} 个学期`)
+    await crud.loadData()
+  } catch (error) {
+    console.error('批量编辑失败:', error)
+    ElMessage.error('批量编辑失败')
+  }
+}
+
+// 批量复制处理
+async function handleBatchCopy(copyData, selectedItems) {
+  if (selectedItems.length === 0) {
+    ElMessage.warning('请先选择要复制的学期')
+    return
+  }
+
+  try {
+    const itemIds = selectedItems.map(item => item.id)
+
+    await api.post('/semesters/batch-copy', {
+      semester_ids: itemIds,
+      copy_data: copyData
+    })
+
+    const totalCopies = itemIds.length * copyData.copy_count
+    ElMessage.success(`成功复制 ${totalCopies} 个学期`)
+    await crud.loadData()
+  } catch (error) {
+    console.error('批量复制失败:', error)
+    ElMessage.error('批量复制失败')
+  }
 }
 
 // 初始化加载数据

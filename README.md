@@ -1,6 +1,38 @@
-# 学校考试系统 (School Exam System)
+# 🎓 红旗小学考试管理系统 (HQXX Exam Management System)
 
-一个基于 FastAPI + Vue3 的学校考试系统，支持按学期、年级、学科、题目分类来管理和展示试题。
+一个功能完整的企业级考试管理解决方案，基于 FastAPI + Vue 3 构建。
+
+## ✨ **系统特色**
+
+- 🎯 **完整的试题管理** - 富文本编辑、批量操作、搜索筛选
+- 🔐 **企业级权限控制** - 5角色22权限细粒度管理
+- 📊 **实时系统监控** - CPU、内存、磁盘、网络监控
+- 💾 **多重数据备份** - 本地+WebDAV远程备份
+- ⚡ **高性能优化** - 数据库索引、虚拟滚动、懒加载
+- 🎨 **现代化界面** - 响应式设计、Element Plus组件
+
+## 🚀 **快速启动**
+
+### Windows用户
+```bash
+start_system.bat
+```
+
+### Linux/Mac用户
+```bash
+chmod +x start_system.sh
+./start_system.sh
+```
+
+### 访问地址
+- **管理后台**: http://localhost:3001
+- **API文档**: http://localhost:8000/docs
+- **默认账号**: admin / admin123
+
+## 📖 **详细文档**
+- [快速启动指南](QUICK_START_GUIDE.md)
+- [项目完成报告](PROJECT_FINAL_COMPLETION_REPORT.md)
+- [性能优化报告](PERFORMANCE_PERMISSION_OPTIMIZATION_REPORT.md)
 
 ## 项目结构
 

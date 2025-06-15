@@ -150,7 +150,7 @@ const previewExtraInfo = computed(() => {
   }
   
   if (form.tags && form.tags.trim()) {
-    const tags = form.tags.split(',').map(tag => tag.trim()).filter(Boolean)
+    const tags = (form.tags || '').split(',').map(tag => tag.trim()).filter(Boolean)
     if (tags.length > 0) {
       info.tags = {
         label: '标签',

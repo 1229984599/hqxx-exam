@@ -1,31 +1,36 @@
 import { createRouter, createWebHistory } from 'vue-router'
-import HomeView from '../views/HomeView.vue'
-import QuestionView from '../views/QuestionView.vue'
+import Home from '@/views/Home.vue'
+import Questions from '@/views/Questions.vue'
+
+const routes = [
+  {
+    path: '/',
+    name: 'Home',
+    component: Home,
+    meta: {
+      title: '配置选择'
+    }
+  },
+  {
+    path: '/questions',
+    name: 'Questions',
+    component: Questions,
+    meta: {
+      title: '试题练习'
+    }
+  }
+]
 
 const router = createRouter({
-  history: createWebHistory(import.meta.env.BASE_URL),
-  routes: [
-    {
-      path: '/',
-      name: 'home',
-      component: HomeView
-    },
-    {
-      path: '/question',
-      name: 'question',
-      component: QuestionView
-    },
-    {
-      path: '/test',
-      name: 'test',
-      component: () => import('../views/TestView.vue')
-    },
-    {
-      path: '/demo',
-      name: 'demo',
-      component: () => import('../views/DemoView.vue')
-    }
-  ]
+  history: createWebHistory(),
+  routes
+})
+
+// 路由守卫
+router.beforeEach((to, from, next) => {
+  // 设置页面标题
+  document.title = `${to.meta.title} - 红旗小学考试系统`
+  next()
 })
 
 export default router

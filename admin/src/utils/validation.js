@@ -445,3 +445,312 @@ export const formHelpers = {
     }
   }
 }
+
+/**
+ * 智能表单验证系统
+ */
+export class SmartValidator {
+  constructor() {
+    this.state = reactive({
+      fields: new Map(),
+      errors: new Map(),
+      touched: new Map(),
+      validating: new Map(),
+      rules: new Map()
+    })
+
+    this.debounceTimers = new Map()
+    this.asyncValidators = new Map()
+  }
+
+  /**
+   * 注册字段
+   */
+  registerField(name, rules = [], options = {}) {
+    this.state.rules.set(name, rules)
+    this.state.fields.set(name, options.defaultValue || '')
+    this.state.errors.delete(name)
+    this.state.touched.set(name, false)
+    this.state.validating.set(name, false)
+
+    // 如果有异步验证器，注册它
+    if (options.asyncValidator) {
+      this.asyncValidators.set(name, options.asyncValidator)
+    }
+  }
+
+  /**
+   * 设置字段值
+   */
+  setValue(name, value) {
+    this.state.fields.set(name, value)
+    this.state.touched.set(name, true)
+
+    // 实时验证（防抖）
+    this.debounceValidate(name, value)
+  }
+
+  /**
+   * 防抖验证
+   */
+  debounceValidate(name, value, delay = 300) {
+    if (this.debounceTimers.has(name)) {
+      clearTimeout(this.debounceTimers.get(name))
+    }
+
+    const timer = setTimeout(() => {
+      this.validateField(name, value)
+    }, delay)
+
+    this.debounceTimers.set(name, timer)
+  }
+
+  /**
+   * 验证单个字段
+   */
+  async validateField(name, value = null) {
+    const fieldValue = value !== null ? value : this.state.fields.get(name)
+    const rules = this.state.rules.get(name) || []
+
+    this.state.validating.set(name, true)
+    this.state.errors.delete(name)
+
+    try {
+      // 同步验证
+      for (const rule of rules) {
+        const result = await this.executeRule(rule, fieldValue, name)
+        if (!result.valid) {
+          this.state.errors.set(name, result.message)
+          break
+        }
+      }
+
+      // 异步验证
+      if (this.asyncValidators.has(name) && !this.state.errors.has(name)) {
+        const asyncValidator = this.asyncValidators.get(name)
+        try {
+          const result = await asyncValidator(fieldValue)
+          if (!result.valid) {
+            this.state.errors.set(name, result.message)
+          }
+        } catch (error) {
+          this.state.errors.set(name, error.message || '验证失败')
+        }
+      }
+    } catch (error) {
+      this.state.errors.set(name, error.message || '验证出错')
+    } finally {
+      this.state.validating.set(name, false)
+    }
+
+    return !this.state.errors.has(name)
+  }
+
+  /**
+   * 执行验证规则
+   */
+  async executeRule(rule, value, fieldName) {
+    return new Promise((resolve) => {
+      if (rule.required && (!value || value === '')) {
+        resolve({ valid: false, message: rule.message })
+        return
+      }
+
+      if (!value && !rule.required) {
+        resolve({ valid: true })
+        return
+      }
+
+      if (rule.pattern && !rule.pattern.test(value)) {
+        resolve({ valid: false, message: rule.message })
+        return
+      }
+
+      if (rule.validator) {
+        rule.validator(rule, value, (error) => {
+          if (error) {
+            resolve({ valid: false, message: error.message })
+          } else {
+            resolve({ valid: true })
+          }
+        })
+        return
+      }
+
+      if (rule.min !== undefined && value.length < rule.min) {
+        resolve({ valid: false, message: rule.message })
+        return
+      }
+
+      if (rule.max !== undefined && value.length > rule.max) {
+        resolve({ valid: false, message: rule.message })
+        return
+      }
+
+      resolve({ valid: true })
+    })
+  }
+
+  /**
+   * 验证所有字段
+   */
+  async validateAll() {
+    const promises = Array.from(this.state.fields.keys()).map(name =>
+      this.validateField(name)
+    )
+
+    const results = await Promise.all(promises)
+    return results.every(result => result)
+  }
+
+  /**
+   * 获取字段值
+   */
+  getValue(name) {
+    return this.state.fields.get(name)
+  }
+
+  /**
+   * 获取字段错误
+   */
+  getError(name) {
+    return this.state.errors.get(name)
+  }
+
+  /**
+   * 检查字段是否有错误
+   */
+  hasError(name) {
+    return this.state.errors.has(name)
+  }
+
+  /**
+   * 检查字段是否被触摸
+   */
+  isTouched(name) {
+    return this.state.touched.get(name) || false
+  }
+
+  /**
+   * 检查字段是否正在验证
+   */
+  isValidating(name) {
+    return this.state.validating.get(name) || false
+  }
+
+  /**
+   * 检查表单是否有效
+   */
+  isValid() {
+    return this.state.errors.size === 0
+  }
+
+  /**
+   * 获取所有错误
+   */
+  getAllErrors() {
+    return Object.fromEntries(this.state.errors)
+  }
+
+  /**
+   * 清除字段错误
+   */
+  clearError(name) {
+    this.state.errors.delete(name)
+  }
+
+  /**
+   * 清除所有错误
+   */
+  clearAllErrors() {
+    this.state.errors.clear()
+  }
+
+  /**
+   * 重置表单
+   */
+  reset() {
+    this.state.fields.clear()
+    this.state.errors.clear()
+    this.state.touched.clear()
+    this.state.validating.clear()
+
+    // 清除防抖定时器
+    this.debounceTimers.forEach(timer => clearTimeout(timer))
+    this.debounceTimers.clear()
+  }
+
+  /**
+   * 获取表单数据
+   */
+  getFormData() {
+    return Object.fromEntries(this.state.fields)
+  }
+
+  /**
+   * 设置表单数据
+   */
+  setFormData(data) {
+    for (const [name, value] of Object.entries(data)) {
+      this.setValue(name, value)
+    }
+  }
+}
+
+/**
+ * 创建智能验证器实例
+ */
+export function useSmartValidator() {
+  return new SmartValidator()
+}
+
+/**
+ * 异步验证器示例
+ */
+export const asyncValidators = {
+  // 检查用户名是否已存在
+  checkUsernameExists: async (username) => {
+    if (!username) return { valid: true }
+
+    try {
+      // 模拟API调用
+      await new Promise(resolve => setTimeout(resolve, 500))
+
+      // 模拟检查结果
+      const exists = ['admin', 'test', 'user'].includes((username || '').toLowerCase())
+
+      return {
+        valid: !exists,
+        message: exists ? '用户名已存在' : ''
+      }
+    } catch (error) {
+      return {
+        valid: false,
+        message: '检查用户名时出错'
+      }
+    }
+  },
+
+  // 检查邮箱是否已注册
+  checkEmailExists: async (email) => {
+    if (!email || !validators.isEmail(email)) return { valid: true }
+
+    try {
+      // 模拟API调用
+      await new Promise(resolve => setTimeout(resolve, 300))
+
+      // 模拟检查结果
+      const exists = ['admin@example.com', 'test@example.com'].includes((email || '').toLowerCase())
+
+      return {
+        valid: !exists,
+        message: exists ? '邮箱已被注册' : ''
+      }
+    } catch (error) {
+      return {
+        valid: false,
+        message: '检查邮箱时出错'
+      }
+    }
+  }
+}

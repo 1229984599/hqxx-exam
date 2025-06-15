@@ -15,11 +15,23 @@
       dialog-width="600px"
       show-add-button
       add-button-text="添加分类"
+      :can-create="canManageBasicData"
+      :can-edit="canManageBasicData"
+      :can-delete="canManageBasicData"
+      :enable-batch="true"
+      :enable-batch-edit="true"
+      :enable-batch-copy="true"
+      :batch-operations="batchOperations"
+      :batch-edit-fields="batchEditFields"
+      :batch-copy-fields="batchCopyFields"
       @search="crud.handleSearch"
       @reset-filters="crud.resetFilters"
       @edit="handleEdit"
       @delete="handleDelete"
       @submit="handleSubmit"
+      @batch-operation="handleBatchOperation"
+      @batch-edit="handleBatchEdit"
+      @batch-copy="handleBatchCopy"
     >
       <template #filters="{ filters }">
         <!-- 学科筛选 -->
@@ -203,10 +215,59 @@
 import { ref, reactive, computed, onMounted, watch } from 'vue'
 import { Search, Right, Refresh, InfoFilled } from '@element-plus/icons-vue'
 import { useCrud, commonRules, formatDate } from '../composables/useCrud'
+import { usePermissions } from '../composables/usePermissions'
 import CrudTable from '../components/CrudTable.vue'
 import PageLayout from '../components/PageLayout.vue'
 import api from '../utils/api'
 import { generateCategoryCode, cleanCode } from '../utils/pinyin'
+
+const { hasPermission } = usePermissions()
+
+// 权限检查
+const canManageBasicData = computed(() =>
+  hasPermission('basic_data:edit')
+)
+
+// 批量操作配置
+const batchOperations = [
+  {
+    key: 'activate',
+    label: '批量激活',
+    type: 'success',
+    icon: 'Check',
+    confirm: true,
+    confirmText: '确定要激活选中的分类吗？'
+  },
+  {
+    key: 'deactivate',
+    label: '批量禁用',
+    type: 'warning',
+    icon: 'Close',
+    confirm: true,
+    confirmText: '确定要禁用选中的分类吗？'
+  },
+  {
+    key: 'delete',
+    label: '批量删除',
+    type: 'danger',
+    icon: 'Delete',
+    confirm: true,
+    confirmText: '确定要删除选中的分类吗？此操作不可恢复！'
+  }
+]
+
+// 批量编辑字段配置
+const batchEditFields = {
+  is_active: null,
+  subject_id: null,
+  sort_order: null
+}
+
+// 批量复制字段配置
+const batchCopyFields = {
+  copy_count: 1,
+  name_suffix: '_副本'
+}
 
 const subjects = ref([])
 const autoGenerateCode = ref(true) // 是否自动生成代码
@@ -289,6 +350,91 @@ function handleEdit(row) {
 // 处理删除
 async function handleDelete(row) {
   await crud.deleteData(row.id)
+}
+
+// 批量操作处理
+async function handleBatchOperation(operation, selectedItems) {
+  if (selectedItems.length === 0) {
+    ElMessage.warning('请先选择要操作的分类')
+    return
+  }
+
+  try {
+    const itemIds = selectedItems.map(item => item.id)
+
+    switch (operation.key) {
+      case 'activate':
+        await api.post('/categories/batch-update', {
+          category_ids: itemIds,
+          update_data: { is_active: true }
+        })
+        ElMessage.success(`成功激活 ${itemIds.length} 个分类`)
+        break
+      case 'deactivate':
+        await api.post('/categories/batch-update', {
+          category_ids: itemIds,
+          update_data: { is_active: false }
+        })
+        ElMessage.success(`成功禁用 ${itemIds.length} 个分类`)
+        break
+      case 'delete':
+        await api.post('/categories/batch-delete', { category_ids: itemIds })
+        ElMessage.success(`成功删除 ${itemIds.length} 个分类`)
+        break
+    }
+
+    await crud.loadData()
+  } catch (error) {
+    console.error('批量操作失败:', error)
+    ElMessage.error('批量操作失败')
+  }
+}
+
+// 批量编辑处理
+async function handleBatchEdit(editData, selectedItems) {
+  if (selectedItems.length === 0) {
+    ElMessage.warning('请先选择要编辑的分类')
+    return
+  }
+
+  try {
+    const itemIds = selectedItems.map(item => item.id)
+
+    await api.post('/categories/batch-update', {
+      category_ids: itemIds,
+      update_data: editData
+    })
+
+    ElMessage.success(`成功编辑 ${itemIds.length} 个分类`)
+    await crud.loadData()
+  } catch (error) {
+    console.error('批量编辑失败:', error)
+    ElMessage.error('批量编辑失败')
+  }
+}
+
+// 批量复制处理
+async function handleBatchCopy(copyData, selectedItems) {
+  if (selectedItems.length === 0) {
+    ElMessage.warning('请先选择要复制的分类')
+    return
+  }
+
+  try {
+    const itemIds = selectedItems.map(item => item.id)
+
+    await api.post('/categories/batch-copy', {
+      category_ids: itemIds,
+      copy_data: copyData
+    })
+
+    const totalCopies = itemIds.length * copyData.copy_count
+    ElMessage.success(`成功复制 ${totalCopies} 个分类`)
+    await crud.loadData()
+  } catch (error) {
+    console.error('批量复制失败:', error)
+    ElMessage.error('批量复制失败')
+  }
 }
 
 // 处理提交

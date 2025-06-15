@@ -252,7 +252,7 @@ export function sortArray(arr, key, order = 'asc') {
  * @returns {any} 值
  */
 export function getNestedValue(obj, path, defaultValue = null) {
-  return path.split('.').reduce((current, key) => {
+  return (path || '').split('.').reduce((current, key) => {
     return current && current[key] !== undefined ? current[key] : defaultValue
   }, obj)
 }
@@ -264,7 +264,7 @@ export function getNestedValue(obj, path, defaultValue = null) {
  * @param {any} value - 值
  */
 export function setNestedValue(obj, path, value) {
-  const keys = path.split('.')
+  const keys = (path || '').split('.')
   const lastKey = keys.pop()
   const target = keys.reduce((current, key) => {
     if (!current[key] || typeof current[key] !== 'object') {

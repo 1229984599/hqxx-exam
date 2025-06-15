@@ -1,5 +1,7 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
+import { findMenuByRoute } from '../utils/menuConfig'
+import { ElMessage } from 'element-plus'
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -76,6 +78,16 @@ const router = createRouter({
           component: () => import('../views/TinyMCETestView.vue')
         },
         {
+          path: 'permission-help',
+          name: 'permission-help',
+          component: () => import('../views/PermissionHelpView.vue')
+        },
+        {
+          path: 'permission-guide',
+          name: 'permission-guide',
+          component: () => import('../views/PermissionManagementGuideView.vue')
+        },
+        {
           path: 'system',
           name: 'system',
           component: () => import('../views/SystemView.vue')
@@ -104,6 +116,21 @@ const router = createRouter({
           path: 'system/settings',
           name: 'system-settings',
           component: () => import('../views/SystemSettingsView.vue')
+        },
+        {
+          path: 'users/admins',
+          name: 'admin-management',
+          component: () => import('../views/AdminManagementView.vue')
+        },
+        {
+          path: 'users/roles',
+          name: 'role-management',
+          component: () => import('../views/RoleManagementView.vue')
+        },
+        {
+          path: 'system/monitor',
+          name: 'system-monitor',
+          component: () => import('../views/SystemMonitorView.vue')
         }
       ]
     }
@@ -113,14 +140,63 @@ const router = createRouter({
 // 路由守卫
 router.beforeEach((to, from, next) => {
   const authStore = useAuthStore()
-  
+
+  // 检查登录状态
   if (to.meta.requiresAuth && !authStore.isAuthenticated) {
     next('/login')
-  } else if (to.meta.requiresGuest && authStore.isAuthenticated) {
-    next('/')
-  } else {
-    next()
+    return
   }
+
+  if (to.meta.requiresGuest && authStore.isAuthenticated) {
+    next('/')
+    return
+  }
+
+  // 检查页面权限（基于权限的PBAC）
+  if (to.meta.requiresAuth && authStore.isAuthenticated) {
+    const menuItem = findMenuByRoute(to.name)
+
+    // 如果找到菜单配置且有权限要求
+    if (menuItem && (menuItem.permissions || menuItem.roles)) {
+      let hasAccess = false
+
+      // 超级管理员可以访问所有页面
+      if (authStore.isSuperuser) {
+        hasAccess = true
+      } else {
+        // 优先检查权限，如果没有权限配置则检查角色
+        if (menuItem.permissions) {
+          if (Array.isArray(menuItem.permissions)) {
+            hasAccess = authStore.hasAnyPermission(menuItem.permissions)
+          } else {
+            hasAccess = authStore.hasPermission(menuItem.permissions)
+          }
+        } else if (menuItem.roles) {
+          // 兼容旧的角色配置
+          if (Array.isArray(menuItem.roles)) {
+            hasAccess = authStore.hasAnyRole(menuItem.roles)
+          } else {
+            hasAccess = authStore.hasRole(menuItem.roles)
+          }
+        }
+      }
+
+      if (!hasAccess) {
+        ElMessage.error('权限不足，无法访问此页面')
+        // 重定向到仪表板或上一页
+        if (from.name) {
+          next(false) // 阻止导航
+        } else {
+          next('/') // 重定向到仪表板
+        }
+        return
+      }
+    }
+  }
+
+  next()
 })
+
+
 
 export default router

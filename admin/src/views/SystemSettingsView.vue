@@ -493,12 +493,15 @@ onMounted(() => {
 // 方法
 async function loadSettings() {
   try {
-    // 模拟加载设置
-    // const response = await api.get('/system/settings')
-    // Object.assign(basicSettings, response.data.basic)
-    // Object.assign(securitySettings, response.data.security)
-    // Object.assign(fileSettings, response.data.file)
-    // Object.assign(emailSettings, response.data.email)
+    // 调用真实API加载设置
+    const response = await api.get('/system/config/settings')
+    if (response.data.settings) {
+      const settings = response.data.settings
+      if (settings.basic) Object.assign(basicSettings, settings.basic)
+      if (settings.security) Object.assign(securitySettings, settings.security)
+      if (settings.file) Object.assign(fileSettings, settings.file)
+      if (settings.email) Object.assign(emailSettings, settings.email)
+    }
   } catch (error) {
     console.error('加载系统设置失败:', error)
   }
@@ -507,18 +510,17 @@ async function loadSettings() {
 async function saveAllSettings() {
   try {
     saving.value = true
-    
+
     const settings = {
       basic: basicSettings,
       security: securitySettings,
       file: fileSettings,
       email: emailSettings
     }
-    
-    // 模拟保存设置
-    await new Promise(resolve => setTimeout(resolve, 2000))
-    // await api.post('/system/settings', settings)
-    
+
+    // 调用真实API保存设置
+    await api.post('/system/config/settings', settings)
+
     ElMessage.success('系统设置保存成功')
   } catch (error) {
     console.error('保存系统设置失败:', error)
@@ -553,20 +555,24 @@ async function resetSettings() {
 async function testCdnConnection() {
   try {
     testingCdn.value = true
-    
-    if (!fileSettings.cdn.accessKey || !fileSettings.cdn.secretKey) {
+
+    if (!fileSettings.cdn.accessKey || !fileSettings.cdn.secretKey || !fileSettings.cdn.bucket || !fileSettings.cdn.domain) {
       ElMessage.warning('请填写完整的CDN配置信息')
       return
     }
-    
-    // 模拟测试CDN连接
-    await new Promise(resolve => setTimeout(resolve, 2000))
-    // await api.post('/system/test-cdn', fileSettings.cdn)
-    
-    ElMessage.success('CDN连接测试成功')
+
+    // 调用真实的CDN测试API
+    const response = await api.post('/system/test-cdn', fileSettings.cdn)
+
+    if (response.data.status === 'success') {
+      ElMessage.success('CDN连接测试成功')
+    } else {
+      ElMessage.error('CDN连接测试失败')
+    }
   } catch (error) {
     console.error('CDN连接测试失败:', error)
-    ElMessage.error('CDN连接测试失败')
+    const errorMessage = error.response?.data?.detail || error.message || 'CDN连接测试失败'
+    ElMessage.error(errorMessage)
   } finally {
     testingCdn.value = false
   }
@@ -575,20 +581,24 @@ async function testCdnConnection() {
 async function testEmailConnection() {
   try {
     testingEmail.value = true
-    
-    if (!emailSettings.host || !emailSettings.username) {
+
+    if (!emailSettings.host || !emailSettings.username || !emailSettings.password) {
       ElMessage.warning('请填写完整的邮件配置信息')
       return
     }
-    
-    // 模拟测试邮件发送
-    await new Promise(resolve => setTimeout(resolve, 3000))
-    // await api.post('/system/test-email', emailSettings)
-    
-    ElMessage.success('测试邮件发送成功')
+
+    // 调用真实的邮件测试API
+    const response = await api.post('/system/test-email', emailSettings)
+
+    if (response.data.status === 'success') {
+      ElMessage.success('测试邮件发送成功，请检查邮箱')
+    } else {
+      ElMessage.error('测试邮件发送失败')
+    }
   } catch (error) {
     console.error('邮件发送测试失败:', error)
-    ElMessage.error('邮件发送测试失败')
+    const errorMsg = error.response?.data?.detail || '邮件发送测试失败'
+    ElMessage.error(errorMsg)
   } finally {
     testingEmail.value = false
   }

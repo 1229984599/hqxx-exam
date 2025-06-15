@@ -1,17 +1,30 @@
-from datetime import timedelta
-from fastapi import APIRouter, Depends, HTTPException, status
+from datetime import timedelta, datetime
+from fastapi import APIRouter, Depends, HTTPException, status, Request
+from pydantic import BaseModel
 from fastapi.security import OAuth2PasswordRequestForm
 from app.models.admin import Admin
-from app.schemas.auth import Token, AdminLogin, AdminCreate, AdminResponse, AdminUpdate
+from app.models.question import Question
+from app.models.system_log import SystemLog, LogLevel
+from app.schemas.auth import Token, AdminLogin, AdminCreate, AdminResponse, AdminUpdate, AdminPermissionsResponse, RoleInfo
 from app.utils.auth import verify_password, get_password_hash, create_access_token, verify_token_with_detail
 from app.dependencies.auth import get_current_active_admin, get_current_superuser
 from app.config import settings
+from app.utils.logger import SystemLogger
+from app.utils.permissions import PermissionManager
 
 router = APIRouter(prefix="/auth", tags=["认证"])
 
 
+class UserStatsResponse(BaseModel):
+    """用户统计响应模型"""
+    created_questions: int
+    last_login_days: int
+    total_login_count: int
+    join_days: int
+
+
 @router.post("/login", response_model=Token, summary="管理员登录")
-async def login(form_data: OAuth2PasswordRequestForm = Depends()):
+async def login(form_data: OAuth2PasswordRequestForm = Depends(), request: Request = None):
     """管理员登录"""
     # 检查用户名是否为空
     if not form_data.username or not form_data.username.strip():
@@ -34,6 +47,7 @@ async def login(form_data: OAuth2PasswordRequestForm = Depends()):
 
     # 用户不存在
     if not admin:
+        await SystemLogger.auth_login(form_data.username.strip(), False, request)
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="用户名不存在，请检查用户名是否正确",
@@ -42,6 +56,7 @@ async def login(form_data: OAuth2PasswordRequestForm = Depends()):
 
     # 用户被禁用
     if not admin.is_active:
+        await SystemLogger.auth_login(admin.username, False, request)
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="账户已被禁用，请联系系统管理员",
@@ -50,6 +65,7 @@ async def login(form_data: OAuth2PasswordRequestForm = Depends()):
 
     # 密码错误
     if not verify_password(form_data.password, admin.hashed_password):
+        await SystemLogger.auth_login(admin.username, False, request)
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="密码错误，请检查密码是否正确",
@@ -62,11 +78,14 @@ async def login(form_data: OAuth2PasswordRequestForm = Depends()):
         data={"sub": admin.username}, expires_delta=access_token_expires
     )
 
+    # 记录登录成功日志
+    await SystemLogger.auth_login(admin.username, True, request)
+
     return {"access_token": access_token, "token_type": "bearer"}
 
 
 @router.post("/login/json", response_model=Token, summary="JSON格式登录")
-async def login_json(login_data: AdminLogin):
+async def login_json(login_data: AdminLogin, request: Request = None):
     """JSON格式的管理员登录"""
     # 检查用户名是否为空
     if not login_data.username or not login_data.username.strip():
@@ -87,6 +106,7 @@ async def login_json(login_data: AdminLogin):
 
     # 用户不存在
     if not admin:
+        await SystemLogger.auth_login(login_data.username.strip(), False, request)
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="用户名不存在，请检查用户名是否正确"
@@ -94,6 +114,7 @@ async def login_json(login_data: AdminLogin):
 
     # 用户被禁用
     if not admin.is_active:
+        await SystemLogger.auth_login(admin.username, False, request)
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="账户已被禁用，请联系系统管理员"
@@ -101,6 +122,7 @@ async def login_json(login_data: AdminLogin):
 
     # 密码错误
     if not verify_password(login_data.password, admin.hashed_password):
+        await SystemLogger.auth_login(admin.username, False, request)
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="密码错误，请检查密码是否正确"
@@ -111,6 +133,9 @@ async def login_json(login_data: AdminLogin):
     access_token = create_access_token(
         data={"sub": admin.username}, expires_delta=access_token_expires
     )
+
+    # 记录登录成功日志
+    await SystemLogger.auth_login(admin.username, True, request)
 
     return {"access_token": access_token, "token_type": "bearer"}
 
@@ -138,6 +163,66 @@ async def refresh_token(current_admin: Admin = Depends(get_current_active_admin)
 async def read_users_me(current_admin: Admin = Depends(get_current_active_admin)):
     """获取当前登录的管理员信息"""
     return current_admin
+
+
+@router.get("/profile/stats", response_model=UserStatsResponse, summary="获取用户统计信息")
+async def get_user_stats(current_admin: Admin = Depends(get_current_active_admin)):
+    """获取当前用户的统计信息"""
+    # 获取用户创建的试题数量
+    created_questions = await Question.filter(created_by=current_admin.username).count()
+
+    # 获取用户登录次数（从系统日志中统计）
+    total_login_count = await SystemLog.filter(
+        module="auth",
+        message__icontains="登录成功",
+        user=current_admin.username
+    ).count()
+
+    # 计算最后登录时间（天数）
+    last_login_log = await SystemLog.filter(
+        module="auth",
+        message__icontains="登录成功",
+        user=current_admin.username
+    ).order_by("-timestamp").first()
+
+    last_login_days = 0
+    if last_login_log:
+        days_diff = (datetime.now() - last_login_log.timestamp).days
+        last_login_days = max(0, days_diff)
+
+    # 计算加入天数
+    join_days = (datetime.now() - current_admin.created_at).days
+
+    return UserStatsResponse(
+        created_questions=created_questions,
+        last_login_days=last_login_days,
+        total_login_count=total_login_count,
+        join_days=join_days
+    )
+
+
+@router.get("/permissions", response_model=AdminPermissionsResponse, summary="获取当前用户权限")
+async def get_current_user_permissions(current_admin: Admin = Depends(get_current_active_admin)):
+    """获取当前登录管理员的权限和角色信息"""
+    # 获取用户权限
+    permissions = await PermissionManager.get_admin_permissions(current_admin)
+
+    # 获取用户角色
+    roles = await PermissionManager.get_admin_roles(current_admin)
+    role_info = [
+        RoleInfo(
+            id=role.id,
+            name=role.name,
+            code=role.code,
+            description=role.description
+        ) for role in roles
+    ]
+
+    return AdminPermissionsResponse(
+        permissions=permissions,
+        roles=role_info,
+        is_superuser=current_admin.is_superuser
+    )
 
 
 @router.post("/register", response_model=AdminResponse, summary="注册管理员")

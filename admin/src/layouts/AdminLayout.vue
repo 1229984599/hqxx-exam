@@ -13,81 +13,40 @@
       </div>
 
       <nav class="nav-menu">
-        <div style="margin-bottom: 8px" class="menu-item" :class="{ active: $route.name === 'dashboard' }" @click="$router.push('/')">
-          <el-icon class="menu-icon"><Odometer /></el-icon>
-          <span v-show="!isCollapse" class="menu-text" >仪表板</span>
-        </div>
-
-        <div class="menu-group">
-          <div v-show="!isCollapse" class="menu-group-title">基础管理</div>
-
-          <div class="menu-item" :class="{ active: $route.name === 'semesters' }" @click="$router.push('/semesters')">
-            <el-icon class="menu-icon"><Calendar /></el-icon>
-            <span v-show="!isCollapse" class="menu-text">学期管理</span>
+        <!-- 动态渲染菜单 -->
+        <template v-for="menuItem in visibleMenus" :key="menuItem.id">
+          <!-- 单个菜单项 -->
+          <div
+            v-if="!menuItem.type || menuItem.type !== 'group'"
+            style="margin-bottom: 8px"
+            class="menu-item"
+            :class="{ active: isMenuActive(menuItem) }"
+            @click="navigateToMenu(menuItem)"
+          >
+            <el-icon class="menu-icon">
+              <component :is="getIconComponent(menuItem.icon)" />
+            </el-icon>
+            <span v-show="!isCollapse" class="menu-text">{{ menuItem.title }}</span>
           </div>
 
-          <div class="menu-item" :class="{ active: $route.name === 'grades' }" @click="$router.push('/grades')">
-            <el-icon class="menu-icon"><School /></el-icon>
-            <span v-show="!isCollapse" class="menu-text">年级管理</span>
+          <!-- 菜单组 -->
+          <div v-else-if="menuItem.children && menuItem.children.length > 0" class="menu-group">
+            <div v-show="!isCollapse" class="menu-group-title">{{ menuItem.title }}</div>
+
+            <div
+              v-for="childItem in menuItem.children"
+              :key="childItem.id"
+              class="menu-item"
+              :class="{ active: isMenuActive(childItem) }"
+              @click="navigateToMenu(childItem)"
+            >
+              <el-icon class="menu-icon">
+                <component :is="getIconComponent(childItem.icon)" />
+              </el-icon>
+              <span v-show="!isCollapse" class="menu-text">{{ childItem.title }}</span>
+            </div>
           </div>
-
-          <div class="menu-item" :class="{ active: $route.name === 'subjects' }" @click="$router.push('/subjects')">
-            <el-icon class="menu-icon"><Reading /></el-icon>
-            <span v-show="!isCollapse" class="menu-text">学科管理</span>
-          </div>
-
-          <div class="menu-item" :class="{ active: $route.name === 'categories' }" @click="$router.push('/categories')">
-            <el-icon class="menu-icon"><Collection /></el-icon>
-            <span v-show="!isCollapse" class="menu-text">分类管理</span>
-          </div>
-        </div>
-
-        <div class="menu-group">
-          <div v-show="!isCollapse" class="menu-group-title">内容管理</div>
-
-          <div class="menu-item" :class="{ active: ['questions', 'question-add', 'question-edit'].includes($route.name) }" @click="$router.push('/questions')">
-            <el-icon class="menu-icon"><Document /></el-icon>
-            <span v-show="!isCollapse" class="menu-text">试题管理</span>
-          </div>
-
-          <div class="menu-item" :class="{ active: ['templates', 'template-add', 'template-edit'].includes($route.name) }" @click="$router.push('/templates')">
-            <el-icon class="menu-icon"><DocumentCopy /></el-icon>
-            <span v-show="!isCollapse" class="menu-text">模板管理</span>
-          </div>
-        </div>
-
-        <div class="menu-group">
-          <div v-show="!isCollapse" class="menu-group-title">系统管理</div>
-
-          <div class="menu-item" :class="{ active: $route.name === 'system' }" @click="$router.push('/system')">
-            <el-icon class="menu-icon"><Setting /></el-icon>
-            <span v-show="!isCollapse" class="menu-text">系统管理</span>
-          </div>
-
-          <div class="menu-item" :class="{ active: $route.name === 'system-logs' }" @click="$router.push('/system/logs')">
-            <el-icon class="menu-icon"><Document /></el-icon>
-            <span v-show="!isCollapse" class="menu-text">系统日志</span>
-          </div>
-
-          <div class="menu-item" :class="{ active: $route.name === 'backup-management' }" @click="$router.push('/system/backup')">
-            <el-icon class="menu-icon"><FolderOpened /></el-icon>
-            <span v-show="!isCollapse" class="menu-text">备份管理</span>
-          </div>
-
-          <div class="menu-item" :class="{ active: $route.name === 'system-settings' }" @click="$router.push('/system/settings')">
-            <el-icon class="menu-icon"><Tools /></el-icon>
-            <span v-show="!isCollapse" class="menu-text">系统设置</span>
-          </div>
-        </div>
-
-        <div class="menu-group">
-          <div v-show="!isCollapse" class="menu-group-title">开发工具</div>
-
-          <div class="menu-item" :class="{ active: $route.name === 'tinymce-test' }" @click="$router.push('/tinymce-test')">
-            <el-icon class="menu-icon"><Edit /></el-icon>
-            <span v-show="!isCollapse" class="menu-text">编辑器测试</span>
-          </div>
-        </div>
+        </template>
       </nav>
     </div>
 
@@ -121,7 +80,7 @@
           <el-dropdown @command="handleCommand" class="user-dropdown">
             <div class="user-info">
               <el-avatar :size="36" class="user-avatar">
-                {{ authStore.user?.username?.charAt(0)?.toUpperCase() }}
+                {{ authStore.user?.username?.charAt(0)?.toUpperCase() || 'U' }}
               </el-avatar>
               <div v-show="!isCollapse" class="user-details">
                 <span class="username">{{ authStore.user?.username }}</span>
@@ -170,12 +129,17 @@ import {
   Collection,
   Edit,
   FolderOpened,
-  Tools
+  Tools,
+  UserFilled,
+  User,
+  Monitor,
+  QuestionFilled
 } from '@element-plus/icons-vue'
 import { useAuthStore, useAppStore } from '../stores'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import TokenStatus from '../components/TokenStatus.vue'
 import GlobalSearch from '../components/GlobalSearch.vue'
+import { MENU_CONFIG, filterMenuByPermissions, findMenuByRoute } from '../utils/menuConfig'
 
 const router = useRouter()
 const route = useRoute()
@@ -184,29 +148,79 @@ const appStore = useAppStore()
 
 const isCollapse = computed(() => appStore.isCollapsed)
 
+// 根据权限过滤菜单（PBAC核心）
+const visibleMenus = computed(() => {
+  return filterMenuByPermissions(
+    MENU_CONFIG,
+    authStore.hasPermission,
+    authStore.hasAnyPermission,
+    authStore.hasRole,
+    authStore.hasAnyRole,
+    authStore.isSuperuser
+  )
+})
+
+// 图标组件映射
+const iconComponents = {
+  Odometer,
+  Setting,
+  Document,
+  DocumentCopy,
+  Calendar,
+  School,
+  Reading,
+  Collection,
+  Edit,
+  FolderOpened,
+  Tools,
+  UserFilled,
+  User,
+  Monitor,
+  QuestionFilled
+}
+
 function toggleCollapse() {
   appStore.toggleSidebar()
 }
 
+// 获取图标组件
+function getIconComponent(iconName) {
+  return iconComponents[iconName] || Document
+}
+
+// 检查菜单是否激活
+function isMenuActive(menuItem) {
+  if (menuItem.activeNames) {
+    return menuItem.activeNames.includes(route.name)
+  }
+  return route.name === menuItem.name
+}
+
+// 导航到菜单
+function navigateToMenu(menuItem) {
+  if (menuItem.path) {
+    router.push(menuItem.path)
+  }
+}
+
 function getBreadcrumbText() {
+  // 首先尝试从菜单配置中查找
+  const menuItem = findMenuByRoute(route.name)
+  if (menuItem) {
+    // 如果是子页面，显示父级 / 子级格式
+    if (route.name?.includes('-add')) {
+      return `${menuItem.title} / 添加`
+    } else if (route.name?.includes('-edit')) {
+      return `${menuItem.title} / 编辑`
+    }
+    return menuItem.title
+  }
+
+  // 回退到静态配置
   const routeNames = {
-    'dashboard': '仪表板',
-    'semesters': '学期管理',
-    'grades': '年级管理',
-    'subjects': '学科管理',
-    'categories': '分类管理',
-    'questions': '试题管理',
-    'question-add': '试题管理 / 添加试题',
-    'question-edit': '试题管理 / 编辑试题',
-    'templates': '模板管理',
-    'template-add': '模板管理 / 添加模板',
-    'template-edit': '模板管理 / 编辑模板',
     'system': '系统管理',
-    'system-logs': '系统管理 / 系统日志',
-    'backup-management': '系统管理 / 备份管理',
-    'system-settings': '系统管理 / 系统设置',
-    'profile': '个人资料',
-    'tinymce-test': '编辑器测试'
+    'system-monitor': '系统管理 / 系统监控',
+    'profile': '个人资料'
   }
   return routeNames[route.name] || '管理后台'
 }

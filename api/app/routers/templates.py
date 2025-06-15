@@ -7,6 +7,8 @@ from app.schemas.common import (
     MessageResponse
 )
 from app.dependencies.auth import get_current_active_admin
+from app.utils.permissions import PermissionManager
+from app.models.role import PermissionCode
 
 router = APIRouter(prefix="/templates", tags=["模板管理"])
 
@@ -19,9 +21,13 @@ async def get_templates(
     is_system: bool = Query(None, description="是否系统模板"),
     search: str = Query(None, description="搜索关键词"),
     skip: int = Query(0, ge=0, description="跳过数量"),
-    limit: int = Query(50, ge=1, le=100, description="限制数量")
+    limit: int = Query(50, ge=1, le=100, description="限制数量"),
+    current_admin = Depends(get_current_active_admin)
 ):
     """获取模板列表"""
+    # 检查权限
+    if not current_admin.is_superuser and not await PermissionManager.has_permission(current_admin, PermissionCode.TEMPLATES_VIEW):
+        raise HTTPException(status_code=403, detail="Permission denied")
     query = Template.all().prefetch_related("subject")
 
     if category:
@@ -113,6 +119,9 @@ async def create_template(
     current_admin = Depends(get_current_active_admin)
 ):
     """创建模板"""
+    # 检查权限
+    if not current_admin.is_superuser and not await PermissionManager.has_permission(current_admin, PermissionCode.TEMPLATES_CREATE):
+        raise HTTPException(status_code=403, detail="Permission denied")
     # 验证学科是否存在（如果指定了）
     if template_data.subject_id:
         subject = await Subject.filter(id=template_data.subject_id).first()
@@ -162,6 +171,10 @@ async def update_template(
     current_admin = Depends(get_current_active_admin)
 ):
     """更新模板"""
+    # 检查权限
+    if not current_admin.is_superuser and not await PermissionManager.has_permission(current_admin, PermissionCode.TEMPLATES_EDIT):
+        raise HTTPException(status_code=403, detail="Permission denied")
+
     template = await Template.filter(id=template_id).first()
     if not template:
         raise HTTPException(status_code=404, detail="Template not found")
@@ -220,10 +233,14 @@ async def delete_template(
     current_admin = Depends(get_current_active_admin)
 ):
     """删除模板"""
+    # 检查权限
+    if not current_admin.is_superuser and not await PermissionManager.has_permission(current_admin, PermissionCode.TEMPLATES_DELETE):
+        raise HTTPException(status_code=403, detail="Permission denied")
+
     template = await Template.filter(id=template_id).first()
     if not template:
         raise HTTPException(status_code=404, detail="Template not found")
-    
+
     # 检查是否为系统模板
     if template.is_system and not current_admin.is_superuser:
         raise HTTPException(status_code=403, detail="Cannot delete system template")

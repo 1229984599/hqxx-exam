@@ -45,7 +45,14 @@
           </el-col>
           <el-col :span="6">
             <div class="action-buttons">
-              <el-button type="primary" @click="handleAdd" :icon="Plus">添加模板</el-button>
+              <el-button
+                v-permission="'templates:create'"
+                type="primary"
+                @click="handleAdd"
+                :icon="Plus"
+              >
+                添加模板
+              </el-button>
               <el-button @click="handleRefresh" :icon="Refresh">刷新</el-button>
             </div>
           </el-col>
@@ -78,15 +85,24 @@
                       <el-icon class="item-icon"><View /></el-icon>
                       <span class="item-text">预览</span>
                     </el-dropdown-item>
-                    <el-dropdown-item :command="{action: 'edit', template}" class="dropdown-item">
+                    <el-dropdown-item
+                      v-permission="'templates:edit'"
+                      :command="{action: 'edit', template}"
+                      class="dropdown-item"
+                    >
                       <el-icon class="item-icon"><Edit /></el-icon>
                       <span class="item-text">编辑</span>
                     </el-dropdown-item>
-                    <el-dropdown-item :command="{action: 'copy', template}" class="dropdown-item">
+                    <el-dropdown-item
+                      v-permission="'templates:create'"
+                      :command="{action: 'copy', template}"
+                      class="dropdown-item"
+                    >
                       <el-icon class="item-icon"><DocumentCopy /></el-icon>
                       <span class="item-text">复制</span>
                     </el-dropdown-item>
                     <el-dropdown-item
+                      v-permission="'templates:delete'"
                       :command="{action: 'delete', template}"
                       :disabled="template.is_system"
                       divided
@@ -118,8 +134,13 @@
 
           <!-- 点击提示 -->
           <div class="click-hint">
-            <el-icon class="hint-icon"><Edit /></el-icon>
-            <span class="hint-text">点击编辑</span>
+            <el-icon class="hint-icon" v-if="hasEditPermission">
+              <Edit />
+            </el-icon>
+            <el-icon class="hint-icon" v-else>
+              <View />
+            </el-icon>
+            <span class="hint-text">{{ hasEditPermission ? '点击编辑' : '点击预览' }}</span>
           </div>
         </div>
       </div>
@@ -152,15 +173,21 @@
 </template>
 
 <script setup>
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive, onMounted, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { 
-  Search, Plus, Refresh, MoreFilled, View, Edit, 
-  DocumentCopy, Delete 
+import {
+  Search, Plus, Refresh, MoreFilled, View, Edit,
+  DocumentCopy, Delete
 } from '@element-plus/icons-vue'
 import api from '../utils/api'
+import { usePermissions } from '../composables/usePermissions'
 import PageLayout from '../components/PageLayout.vue'
+
+const { hasRole, hasAnyRole, isAdmin, isSubjectAdmin, hasPermission } = usePermissions()
+
+// 计算属性：检查编辑权限
+const hasEditPermission = computed(() => hasPermission('templates:edit'))
 
 const router = useRouter()
 
@@ -241,24 +268,46 @@ function handleAdd() {
 }
 
 function handleCardClick(template) {
-  // 点击卡片直接进入编辑页面
-  router.push(`/templates/edit/${template.id}`)
+  // 检查编辑权限
+  if (hasEditPermission.value) {
+    // 点击卡片直接进入编辑页面
+    router.push(`/templates/edit/${template.id}`)
+  } else {
+    // 没有编辑权限，提示用户并进入预览页面
+    ElMessage.info('您没有编辑权限，为您打开预览模式')
+    previewTemplate.value = template
+    showPreview.value = true
+  }
 }
 
 function handleAction({ action, template }) {
+  const { hasPermission } = usePermissions()
+
   switch (action) {
     case 'preview':
       previewTemplate.value = template
       showPreview.value = true
       break
     case 'edit':
-      router.push(`/templates/edit/${template.id}`)
+      if (hasPermission('templates:edit')) {
+        router.push(`/templates/edit/${template.id}`)
+      } else {
+        ElMessage.warning('您没有编辑模板的权限')
+      }
       break
     case 'copy':
-      copyTemplate(template)
+      if (hasPermission('templates:create')) {
+        copyTemplate(template)
+      } else {
+        ElMessage.warning('您没有创建模板的权限')
+      }
       break
     case 'delete':
-      deleteTemplate(template)
+      if (hasPermission('templates:delete')) {
+        deleteTemplate(template)
+      } else {
+        ElMessage.warning('您没有删除模板的权限')
+      }
       break
   }
 }

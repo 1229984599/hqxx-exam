@@ -14,11 +14,23 @@
       delete-confirm-field="name"
       show-add-button
       add-button-text="添加年级"
+      :can-create="canManageBasicData"
+      :can-edit="canManageBasicData"
+      :can-delete="canManageBasicData"
+      :enable-batch="true"
+      :enable-batch-edit="true"
+      :enable-batch-copy="true"
+      :batch-operations="batchOperations"
+      :batch-edit-fields="batchEditFields"
+      :batch-copy-fields="batchCopyFields"
       @search="crud.handleSearch"
       @reset-filters="crud.resetFilters"
       @edit="crud.handleEdit"
       @delete="handleDelete"
       @submit="crud.handleSubmit"
+      @batch-operation="handleBatchOperation"
+      @batch-edit="handleBatchEdit"
+      @batch-copy="handleBatchCopy"
     >
       <template #filters="{ filters, resetFilters }">
         <!-- 搜索框 -->
@@ -130,10 +142,61 @@
 
 <script setup>
 import { ref, reactive, computed } from 'vue'
+import { ElMessage } from 'element-plus'
 import { Search } from '@element-plus/icons-vue'
 import { useCrud, commonRules, formatDate } from '../composables/useCrud'
+import { usePermissions } from '../composables/usePermissions'
 import CrudTable from '../components/CrudTable.vue'
 import PageLayout from '../components/PageLayout.vue'
+import api from '../utils/api'
+
+const { hasPermission } = usePermissions()
+
+// 权限检查
+const canManageBasicData = computed(() =>
+  hasPermission('basic_data:edit')
+)
+
+// 批量操作配置
+const batchOperations = [
+  {
+    key: 'activate',
+    label: '批量激活',
+    type: 'success',
+    icon: 'Check',
+    confirm: true,
+    confirmText: '确定要激活选中的年级吗？'
+  },
+  {
+    key: 'deactivate',
+    label: '批量禁用',
+    type: 'warning',
+    icon: 'Close',
+    confirm: true,
+    confirmText: '确定要禁用选中的年级吗？'
+  },
+  {
+    key: 'delete',
+    label: '批量删除',
+    type: 'danger',
+    icon: 'Delete',
+    confirm: true,
+    confirmText: '确定要删除选中的年级吗？此操作不可恢复！'
+  }
+]
+
+// 批量编辑字段配置
+const batchEditFields = {
+  is_active: null,
+  level: null,
+  sort_order: null
+}
+
+// 批量复制字段配置
+const batchCopyFields = {
+  copy_count: 1,
+  name_suffix: '_副本'
+}
 
 // 扩展筛选器以支持级别筛选
 const extendedFilters = reactive({
@@ -184,6 +247,91 @@ const crudTable = ref()
 // 处理删除
 async function handleDelete(row) {
   await crud.deleteData(row.id)
+}
+
+// 批量操作处理
+async function handleBatchOperation(operation, selectedItems) {
+  if (selectedItems.length === 0) {
+    ElMessage.warning('请先选择要操作的年级')
+    return
+  }
+
+  try {
+    const itemIds = selectedItems.map(item => item.id)
+
+    switch (operation.key) {
+      case 'activate':
+        await api.post('/grades/batch-update', {
+          grade_ids: itemIds,
+          update_data: { is_active: true }
+        })
+        ElMessage.success(`成功激活 ${itemIds.length} 个年级`)
+        break
+      case 'deactivate':
+        await api.post('/grades/batch-update', {
+          grade_ids: itemIds,
+          update_data: { is_active: false }
+        })
+        ElMessage.success(`成功禁用 ${itemIds.length} 个年级`)
+        break
+      case 'delete':
+        await api.post('/grades/batch-delete', { grade_ids: itemIds })
+        ElMessage.success(`成功删除 ${itemIds.length} 个年级`)
+        break
+    }
+
+    await crud.loadData()
+  } catch (error) {
+    console.error('批量操作失败:', error)
+    ElMessage.error('批量操作失败')
+  }
+}
+
+// 批量编辑处理
+async function handleBatchEdit(editData, selectedItems) {
+  if (selectedItems.length === 0) {
+    ElMessage.warning('请先选择要编辑的年级')
+    return
+  }
+
+  try {
+    const itemIds = selectedItems.map(item => item.id)
+
+    await api.post('/grades/batch-update', {
+      grade_ids: itemIds,
+      update_data: editData
+    })
+
+    ElMessage.success(`成功编辑 ${itemIds.length} 个年级`)
+    await crud.loadData()
+  } catch (error) {
+    console.error('批量编辑失败:', error)
+    ElMessage.error('批量编辑失败')
+  }
+}
+
+// 批量复制处理
+async function handleBatchCopy(copyData, selectedItems) {
+  if (selectedItems.length === 0) {
+    ElMessage.warning('请先选择要复制的年级')
+    return
+  }
+
+  try {
+    const itemIds = selectedItems.map(item => item.id)
+
+    await api.post('/grades/batch-copy', {
+      grade_ids: itemIds,
+      copy_data: copyData
+    })
+
+    const totalCopies = itemIds.length * copyData.copy_count
+    ElMessage.success(`成功复制 ${totalCopies} 个年级`)
+    await crud.loadData()
+  } catch (error) {
+    console.error('批量复制失败:', error)
+    ElMessage.error('批量复制失败')
+  }
 }
 
 // 获取级别类型

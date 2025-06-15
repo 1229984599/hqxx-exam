@@ -74,8 +74,72 @@
           </el-form-item>
         </div>
 
+        <!-- FTP配置 -->
+        <div v-if="backupConfig.method === 'ftp'" class="ftp-config">
+          <h4>FTP服务器配置</h4>
+          <el-row :gutter="16">
+            <el-col :span="12">
+              <el-form-item label="FTP主机">
+                <el-input
+                  v-model="backupConfig.ftp.host"
+                  placeholder="ftp.example.com"
+                />
+              </el-form-item>
+            </el-col>
+            <el-col :span="12">
+              <el-form-item label="端口">
+                <el-input-number
+                  v-model="backupConfig.ftp.port"
+                  :min="1"
+                  :max="65535"
+                  style="width: 100%"
+                />
+              </el-form-item>
+            </el-col>
+          </el-row>
+
+          <el-row :gutter="16">
+            <el-col :span="12">
+              <el-form-item label="用户名">
+                <el-input
+                  v-model="backupConfig.ftp.username"
+                  placeholder="FTP用户名"
+                />
+              </el-form-item>
+            </el-col>
+            <el-col :span="12">
+              <el-form-item label="密码">
+                <el-input
+                  v-model="backupConfig.ftp.password"
+                  type="password"
+                  placeholder="FTP密码"
+                  show-password
+                />
+              </el-form-item>
+            </el-col>
+          </el-row>
+
+          <el-form-item label="备份路径">
+            <el-input
+              v-model="backupConfig.ftp.path"
+              placeholder="/backups"
+            />
+          </el-form-item>
+
+          <el-form-item>
+            <el-button @click="testFTPConnection" :loading="testing">
+              测试FTP连接
+            </el-button>
+          </el-form-item>
+        </div>
+
         <el-form-item>
-          <el-button type="primary" @click="saveBackupConfig" :loading="saving">
+          <el-button
+            v-role="'super_admin'"
+            type="primary"
+            @click="saveBackupConfig"
+            :loading="saving"
+          >
             保存配置
           </el-button>
         </el-form-item>
@@ -86,15 +150,23 @@
     <div class="backup-operations">
       <h3>📦 备份操作</h3>
       <div class="operation-cards">
-        <div class="operation-card" @click="createBackup">
+        <div
+          v-role="'super_admin'"
+          class="operation-card"
+          @click="createBackup"
+        >
           <div class="card-icon">
             <el-icon><Download /></el-icon>
           </div>
           <h4>创建备份</h4>
           <p>创建当前系统数据的完整备份</p>
         </div>
-        
-        <div class="operation-card" @click="showRestoreDialog = true">
+
+        <div
+          v-role="'super_admin'"
+          class="operation-card"
+          @click="showRestoreDialog = true"
+        >
           <div class="card-icon">
             <el-icon><Upload /></el-icon>
           </div>
@@ -153,15 +225,29 @@
           </template>
         </el-table-column>
         
-        <el-table-column label="操作" width="200">
+        <el-table-column label="操作" width="240">
           <template #default="{ row }">
-            <el-button size="small" @click="downloadBackup(row)">
+            <el-button
+              v-role="'super_admin'"
+              size="small"
+              @click="downloadBackup(row)"
+            >
               下载
             </el-button>
-            <el-button size="small" type="warning" @click="restoreFromBackup(row)">
+            <el-button
+              v-role="'super_admin'"
+              size="small"
+              type="warning"
+              @click="restoreFromBackup(row)"
+            >
               恢复
             </el-button>
-            <el-button size="small" type="danger" @click="deleteBackup(row)">
+            <el-button
+              v-role="'super_admin'"
+              size="small"
+              type="danger"
+              @click="deleteBackup(row)"
+            >
               删除
             </el-button>
           </template>
@@ -217,11 +303,14 @@
 <script setup>
 import { ref, reactive, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { 
-  Download, Upload, Timer, Document, UploadFilled 
+import {
+  Download, Upload, Timer, Document, UploadFilled
 } from '@element-plus/icons-vue'
+import { usePermissions } from '../composables/usePermissions'
 import api from '../utils/api'
 import PageLayout from '../components/PageLayout.vue'
+
+const { hasRole } = usePermissions()
 
 // 响应式数据
 const saving = ref(false)
@@ -262,9 +351,11 @@ onMounted(() => {
 // 方法
 async function loadBackupConfig() {
   try {
-    // 模拟加载配置
-    // const response = await api.get('/system/backup/config')
-    // Object.assign(backupConfig, response.data)
+    // 调用真实API加载配置
+    const response = await api.get('/system/config/backup')
+    if (response.data.config) {
+      Object.assign(backupConfig, response.data.config)
+    }
   } catch (error) {
     console.error('加载备份配置失败:', error)
   }
@@ -273,11 +364,20 @@ async function loadBackupConfig() {
 async function saveBackupConfig() {
   try {
     saving.value = true
-    
-    // 模拟保存配置
-    await new Promise(resolve => setTimeout(resolve, 1000))
-    // await api.post('/system/backup/config', backupConfig)
-    
+
+    // 准备符合后端API期望的数据结构
+    const configData = {
+      method: backupConfig.method,
+      autoBackup: backupConfig.autoBackup,
+      webdav: backupConfig.webdav,
+      ftp: backupConfig.ftp
+    }
+
+    console.log('发送备份配置数据:', configData)
+
+    // 调用真实API保存配置
+    await api.post('/system/config/backup', configData)
+
     ElMessage.success('备份配置保存成功')
   } catch (error) {
     console.error('保存备份配置失败:', error)
@@ -290,16 +390,15 @@ async function saveBackupConfig() {
 async function testWebDAVConnection() {
   try {
     testing.value = true
-    
+
     if (!backupConfig.webdav.url || !backupConfig.webdav.username) {
       ElMessage.warning('请填写完整的WebDAV配置信息')
       return
     }
-    
-    // 模拟测试连接
-    await new Promise(resolve => setTimeout(resolve, 2000))
-    // await api.post('/system/backup/test-webdav', backupConfig.webdav)
-    
+
+    // 调用真实API测试连接
+    await api.post('/system/backup/test-webdav', backupConfig.webdav)
+
     ElMessage.success('WebDAV连接测试成功')
   } catch (error) {
     console.error('WebDAV连接测试失败:', error)
@@ -309,10 +408,45 @@ async function testWebDAVConnection() {
   }
 }
 
+async function testFTPConnection() {
+  try {
+    testing.value = true
+
+    if (!backupConfig.ftp.host || !backupConfig.ftp.username) {
+      ElMessage.warning('请填写完整的FTP配置信息')
+      return
+    }
+
+    // 调用真实API测试连接
+    await api.post('/system/backup/test-ftp', backupConfig.ftp)
+
+    ElMessage.success('FTP连接测试成功')
+  } catch (error) {
+    console.error('FTP连接测试失败:', error)
+    ElMessage.error('FTP连接测试失败')
+  } finally {
+    testing.value = false
+  }
+}
+
 async function createBackup() {
   try {
+    // 检查备份方法配置
+    if (backupConfig.method === 'webdav') {
+      if (!backupConfig.webdav.url || !backupConfig.webdav.username) {
+        ElMessage.warning('请先配置WebDAV连接信息')
+        return
+      }
+    } else if (backupConfig.method === 'ftp') {
+      if (!backupConfig.ftp.host || !backupConfig.ftp.username) {
+        ElMessage.warning('请先配置FTP连接信息')
+        return
+      }
+    }
+
+    const methodText = getMethodText(backupConfig.method)
     await ElMessageBox.confirm(
-      '确定要创建数据备份吗？备份过程可能需要几分钟时间。',
+      `确定要使用 ${methodText} 方式创建数据备份吗？备份过程可能需要几分钟时间。`,
       '创建备份确认',
       {
         confirmButtonText: '开始备份',
@@ -322,18 +456,29 @@ async function createBackup() {
     )
 
     const loading = ElMessage({
-      message: '正在创建备份，请稍候...',
+      message: `正在使用 ${methodText} 方式创建备份，请稍候...`,
       type: 'info',
       duration: 0
     })
 
     try {
-      // 模拟备份过程
-      await new Promise(resolve => setTimeout(resolve, 3000))
-      // await api.post('/system/backup/create', { method: backupConfig.method })
-      
+      // 调用真实API创建备份，传递备份方法和配置
+      const backupData = {
+        method: backupConfig.method
+      }
+
+      // 根据备份方法添加相应的配置
+      if (backupConfig.method === 'webdav') {
+        backupData.webdav = backupConfig.webdav
+      } else if (backupConfig.method === 'ftp') {
+        backupData.ftp = backupConfig.ftp
+      }
+
+      console.log('发送备份请求数据:', backupData)
+      const response = await api.post('/system/backup', backupData)
+
       loading.close()
-      ElMessage.success('数据备份创建成功！')
+      ElMessage.success(`使用 ${methodText} 方式创建备份成功！`)
       await loadBackupHistory()
     } catch (error) {
       loading.close()
@@ -350,36 +495,10 @@ async function createBackup() {
 async function loadBackupHistory() {
   try {
     loadingHistory.value = true
-    
-    // 模拟加载备份历史
-    await new Promise(resolve => setTimeout(resolve, 1000))
-    
-    backupHistory.value = [
-      {
-        id: 1,
-        filename: 'hqxx-exam-backup-20241201-143022.sql',
-        size: 2048576,
-        method: 'webdav',
-        status: 'success',
-        created_at: new Date(Date.now() - 1000 * 60 * 30).toISOString()
-      },
-      {
-        id: 2,
-        filename: 'hqxx-exam-backup-20241201-120000.sql',
-        size: 1945600,
-        method: 'local',
-        status: 'success',
-        created_at: new Date(Date.now() - 1000 * 60 * 60 * 3).toISOString()
-      },
-      {
-        id: 3,
-        filename: 'hqxx-exam-backup-20241130-180000.sql',
-        size: 1876543,
-        method: 'webdav',
-        status: 'failed',
-        created_at: new Date(Date.now() - 1000 * 60 * 60 * 24).toISOString()
-      }
-    ]
+
+    // 调用真实API加载备份历史
+    const response = await api.get('/system/backup/history')
+    backupHistory.value = response.data.backups || []
   } catch (error) {
     console.error('加载备份历史失败:', error)
     ElMessage.error('加载备份历史失败')
@@ -390,6 +509,13 @@ async function loadBackupHistory() {
 
 function handleMethodChange() {
   // 方法改变时的处理
+  if (backupConfig.method === 'webdav') {
+    ElMessage.info('请配置WebDAV连接信息并测试连接')
+  } else if (backupConfig.method === 'ftp') {
+    ElMessage.info('请配置FTP连接信息')
+  } else {
+    ElMessage.info('已选择本地备份方式')
+  }
 }
 
 function scheduleBackup() {
@@ -459,9 +585,23 @@ async function confirmRestore() {
 async function downloadBackup(backup) {
   try {
     ElMessage.info('开始下载备份文件...')
-    // 实际项目中应该调用下载API
-    // const response = await api.get(`/system/backup/download/${backup.id}`, { responseType: 'blob' })
-    // 下载文件逻辑
+
+    // 创建下载链接
+    const response = await api.get(`/system/backup/download/${backup.id}`, {
+      responseType: 'blob'
+    })
+
+    // 创建下载链接
+    const url = window.URL.createObjectURL(new Blob([response.data]))
+    const link = document.createElement('a')
+    link.href = url
+    link.setAttribute('download', backup.filename)
+    document.body.appendChild(link)
+    link.click()
+    link.remove()
+    window.URL.revokeObjectURL(url)
+
+    ElMessage.success('备份文件下载成功')
   } catch (error) {
     console.error('下载备份失败:', error)
     ElMessage.error('下载备份失败')
@@ -471,7 +611,7 @@ async function downloadBackup(backup) {
 async function restoreFromBackup(backup) {
   try {
     await ElMessageBox.confirm(
-      `确定要从备份文件 "${backup.filename}" 恢复数据吗？`,
+      `确定要从备份文件 "${backup.filename}" 恢复数据吗？此操作将覆盖当前数据，请谨慎操作！`,
       '恢复确认',
       {
         confirmButtonText: '确认恢复',
@@ -479,9 +619,34 @@ async function restoreFromBackup(backup) {
         type: 'warning'
       }
     )
-    
-    ElMessage.info('开始恢复数据...')
-    // await api.post(`/system/backup/restore/${backup.id}`)
+
+    const loading = ElMessage({
+      message: '正在恢复数据，请稍候...',
+      type: 'info',
+      duration: 0
+    })
+
+    try {
+      await api.post(`/system/backup/restore/${backup.id}`)
+      loading.close()
+      ElMessage.success('数据恢复成功！')
+
+      // 提示用户刷新页面
+      await ElMessageBox.confirm(
+        '数据恢复成功！建议刷新页面以确保数据同步。',
+        '恢复完成',
+        {
+          confirmButtonText: '刷新页面',
+          cancelButtonText: '稍后刷新',
+          type: 'success'
+        }
+      )
+
+      window.location.reload()
+    } catch (error) {
+      loading.close()
+      throw error
+    }
   } catch (error) {
     if (error !== 'cancel') {
       console.error('恢复数据失败:', error)
@@ -493,7 +658,7 @@ async function restoreFromBackup(backup) {
 async function deleteBackup(backup) {
   try {
     await ElMessageBox.confirm(
-      `确定要删除备份文件 "${backup.filename}" 吗？`,
+      `确定要删除备份文件 "${backup.filename}" 吗？此操作不可恢复！`,
       '删除确认',
       {
         confirmButtonText: '确认删除',
@@ -501,8 +666,8 @@ async function deleteBackup(backup) {
         type: 'warning'
       }
     )
-    
-    // await api.delete(`/system/backup/${backup.id}`)
+
+    await api.delete(`/system/backup/${backup.id}`)
     ElMessage.success('备份文件删除成功')
     await loadBackupHistory()
   } catch (error) {
@@ -512,6 +677,8 @@ async function deleteBackup(backup) {
     }
   }
 }
+
+
 
 // 工具函数
 function formatFileSize(bytes) {
@@ -589,8 +756,19 @@ function getStatusText(status) {
   background-clip: text;
 }
 
-.webdav-config {
+.webdav-config,
+.ftp-config {
   margin-top: 20px;
+}
+
+.ftp-config h4,
+.webdav-config h4 {
+  font-size: 16px;
+  font-weight: 600;
+  color: #2d3748;
+  margin-bottom: 16px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #e2e8f0;
 }
 
 .operation-cards {

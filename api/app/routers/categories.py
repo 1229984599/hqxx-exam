@@ -3,10 +3,13 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from app.models.category import Category
 from app.models.subject import Subject
 from app.schemas.common import (
-    CategoryCreate, CategoryUpdate, CategoryResponse, 
-    MessageResponse
+    CategoryCreate, CategoryUpdate, CategoryResponse,
+    MessageResponse, BatchUpdateRequest, BatchDeleteRequest,
+    BatchCopyRequest, BatchOperationResponse
 )
 from app.dependencies.auth import get_current_active_admin
+from app.utils.permissions import PermissionManager
+from app.models.role import PermissionCode
 
 router = APIRouter(prefix="/categories", tags=["题目分类管理"])
 
@@ -74,6 +77,10 @@ async def create_category(
     current_admin = Depends(get_current_active_admin)
 ):
     """创建分类"""
+    # 检查权限
+    if not current_admin.is_superuser and not await PermissionManager.has_permission(current_admin, PermissionCode.BASIC_DATA_EDIT):
+        raise HTTPException(status_code=403, detail="Permission denied")
+
     # 检查学科是否存在
     subject = await Subject.filter(id=category_data.subject_id).first()
     if not subject:
@@ -104,6 +111,10 @@ async def update_category(
     current_admin = Depends(get_current_active_admin)
 ):
     """更新分类"""
+    # 检查权限
+    if not current_admin.is_superuser and not await PermissionManager.has_permission(current_admin, PermissionCode.BASIC_DATA_EDIT):
+        raise HTTPException(status_code=403, detail="Permission denied")
+
     category = await Category.filter(id=category_id).first()
     if not category:
         raise HTTPException(status_code=404, detail="Category not found")
@@ -147,9 +158,157 @@ async def delete_category(
     current_admin = Depends(get_current_active_admin)
 ):
     """删除分类"""
+    # 检查权限
+    if not current_admin.is_superuser and not await PermissionManager.has_permission(current_admin, PermissionCode.BASIC_DATA_EDIT):
+        raise HTTPException(status_code=403, detail="Permission denied")
+
     category = await Category.filter(id=category_id).first()
     if not category:
         raise HTTPException(status_code=404, detail="Category not found")
     
     await category.delete()
     return {"message": "Category deleted successfully"}
+
+
+@router.post("/batch-update", response_model=BatchOperationResponse, summary="批量更新分类")
+async def batch_update_categories(
+    request: BatchUpdateRequest,
+    current_admin = Depends(get_current_active_admin)
+):
+    """批量更新分类"""
+    # 检查权限
+    if not current_admin.is_superuser and not await PermissionManager.has_permission(current_admin, PermissionCode.BASIC_DATA_EDIT):
+        raise HTTPException(status_code=403, detail="Permission denied")
+
+    success_count = 0
+    failed_count = 0
+    failed_items = []
+
+    for category_id in request.get_ids():
+        try:
+            category = await Category.filter(id=category_id).first()
+            if not category:
+                failed_count += 1
+                failed_items.append({"id": category_id, "error": "Category not found"})
+                continue
+
+            # 更新分类数据
+            for field, value in request.update_data.items():
+                if hasattr(category, field):
+                    setattr(category, field, value)
+
+            await category.save()
+            success_count += 1
+        except Exception as e:
+            failed_count += 1
+            failed_items.append({"id": category_id, "error": str(e)})
+
+    return BatchOperationResponse(
+        success_count=success_count,
+        failed_count=failed_count,
+        total_count=len(request.get_ids()),
+        message=f"批量更新完成：成功 {success_count} 个，失败 {failed_count} 个",
+        failed_items=failed_items
+    )
+
+
+@router.post("/batch-delete", response_model=BatchOperationResponse, summary="批量删除分类")
+async def batch_delete_categories(
+    request: BatchDeleteRequest,
+    current_admin = Depends(get_current_active_admin)
+):
+    """批量删除分类"""
+    # 检查权限
+    if not current_admin.is_superuser and not await PermissionManager.has_permission(current_admin, PermissionCode.BASIC_DATA_EDIT):
+        raise HTTPException(status_code=403, detail="Permission denied")
+
+    success_count = 0
+    failed_count = 0
+    failed_items = []
+
+    for category_id in request.get_ids():
+        try:
+            category = await Category.filter(id=category_id).first()
+            if not category:
+                failed_count += 1
+                failed_items.append({"id": category_id, "error": "Category not found"})
+                continue
+
+            await category.delete()
+            success_count += 1
+        except Exception as e:
+            failed_count += 1
+            failed_items.append({"id": category_id, "error": str(e)})
+
+    return BatchOperationResponse(
+        success_count=success_count,
+        failed_count=failed_count,
+        total_count=len(request.get_ids()),
+        message=f"批量删除完成：成功 {success_count} 个，失败 {failed_count} 个",
+        failed_items=failed_items
+    )
+
+
+@router.post("/batch-copy", response_model=BatchOperationResponse, summary="批量复制分类")
+async def batch_copy_categories(
+    request: BatchCopyRequest,
+    current_admin = Depends(get_current_active_admin)
+):
+    """批量复制分类"""
+    # 检查权限
+    if not current_admin.is_superuser and not await PermissionManager.has_permission(current_admin, PermissionCode.BASIC_DATA_EDIT):
+        raise HTTPException(status_code=403, detail="Permission denied")
+
+    success_count = 0
+    failed_count = 0
+    failed_items = []
+    copy_count = request.copy_data.get('copy_count', 1)
+    name_suffix = request.copy_data.get('name_suffix', '_副本')
+
+    for category_id in request.get_ids():
+        try:
+            category = await Category.filter(id=category_id).first()
+            if not category:
+                failed_count += 1
+                failed_items.append({"id": category_id, "error": "Category not found"})
+                continue
+
+            for i in range(copy_count):
+                # 创建副本
+                copy_name = f"{category.name}{name_suffix}"
+                if copy_count > 1:
+                    copy_name += f"_{i+1}"
+
+                copy_code = f"{category.code}_copy"
+                if copy_count > 1:
+                    copy_code += f"_{i+1}"
+
+                # 确保代码在同一学科下唯一性
+                counter = 1
+                original_copy_code = copy_code
+                while await Category.filter(subject_id=category.subject_id, code=copy_code).exists():
+                    copy_code = f"{original_copy_code}_{counter}"
+                    counter += 1
+
+                await Category.create(
+                    name=copy_name,
+                    code=copy_code,
+                    subject_id=category.subject_id,
+                    parent_id=category.parent_id,
+                    level=category.level,
+                    is_active=category.is_active,
+                    sort_order=category.sort_order,
+                    description=category.description
+                )
+                success_count += 1
+        except Exception as e:
+            failed_count += 1
+            failed_items.append({"id": category_id, "error": str(e)})
+
+    return BatchOperationResponse(
+        success_count=success_count,
+        failed_count=failed_count,
+        total_count=len(request.get_ids()) * copy_count,
+        message=f"批量复制完成：成功 {success_count} 个，失败 {failed_count} 个",
+        failed_items=failed_items
+    )
