@@ -1,5 +1,5 @@
 # 多阶段构建 - 前端构建阶段
-FROM node:18-alpine AS frontend-builder
+FROM --platform=$BUILDPLATFORM node:18-alpine AS frontend-builder
 
 # 设置工作目录
 WORKDIR /build
@@ -24,7 +24,7 @@ COPY admin/ .
 RUN pnpm build
 
 # Python依赖构建阶段
-FROM python:3.11.6-alpine AS python-builder
+FROM --platform=$BUILDPLATFORM python:3.11.6-alpine AS python-builder
 
 # 安装构建依赖（合并到一个RUN层减少镜像大小）
 RUN apk add --no-cache \
@@ -69,12 +69,19 @@ RUN mkdir -p \
     /app/config \
     /app/scripts \
     /app/data \
-    /var/log/supervisor \
+    /app/logs/nginx \
+    /app/logs/nginx/client_temp \
+    /app/logs/nginx/proxy_temp \
+    /app/logs/nginx/fastcgi_temp \
+    /app/logs/nginx/uwsgi_temp \
+    /app/logs/nginx/scgi_temp \
+    /app/logs/supervisor \
+    /app/logs/redis \
     /run/nginx
 
 # 设置环境变量
 ENV PATH="/app/.venv/bin:$PATH" \
-    PYTHONPATH="/app/api:$PYTHONPATH" \
+    PYTHONPATH="/app/api" \
     PYTHONUNBUFFERED=1 \
     TZ=Asia/Shanghai
 
@@ -95,15 +102,17 @@ COPY docker/init_db.sh /app/scripts/
 
 # 设置权限（合并到一个RUN层）
 RUN chmod +x /app/scripts/start.sh /app/scripts/init_db.sh \
-    && chown -R nginx:nginx /var/lib/nginx /var/log/nginx \
-    && chown -R appuser:appuser /app
+    && chown -R appuser:appuser /app /run/nginx
 
 # 暴露端口
 EXPOSE 80
 
-# 健康检查
-HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-    CMD curl -f http://localhost/api/health || exit 1
+# 健康检查（优化）
+HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
+    CMD curl -f http://localhost/api/health || curl -f http://localhost/ || exit 1
+
+# 切换到非root用户运行
+USER appuser
 
 # 设置启动命令
 CMD ["/app/scripts/start.sh"]

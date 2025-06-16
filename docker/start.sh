@@ -6,17 +6,23 @@ set -e
 
 echo "🚀 启动红旗小学无纸化测评系统..."
 
-# 创建必要的目录
-mkdir -p /var/log/nginx
-mkdir -p /var/log/supervisor
-mkdir -p /var/log/redis
+# 创建必要的目录（使用应用目录避免权限问题）
+mkdir -p /app/logs/nginx/client_temp
+mkdir -p /app/logs/nginx/proxy_temp
+mkdir -p /app/logs/nginx/fastcgi_temp
+mkdir -p /app/logs/nginx/uwsgi_temp
+mkdir -p /app/logs/nginx/scgi_temp
+mkdir -p /app/logs/supervisor
+mkdir -p /app/logs/redis
 mkdir -p /app/data
 mkdir -p /run/nginx
 
-# 设置权限
-chown -R appuser:appuser /app/data
-chown -R nginx:nginx /var/log/nginx
-chown -R nginx:nginx /run/nginx
+# 设置权限（以当前用户身份）
+chmod -R 755 /app/data /app/logs /run/nginx
+
+# 创建空的日志文件
+touch /app/logs/nginx/error.log /app/logs/nginx/access.log
+chmod 644 /app/logs/nginx/error.log /app/logs/nginx/access.log
 
 # 等待一下确保目录创建完成
 sleep 1

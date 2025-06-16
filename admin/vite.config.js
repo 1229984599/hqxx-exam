@@ -5,14 +5,27 @@ import Components from 'unplugin-vue-components/vite'
 import { ElementPlusResolver } from 'unplugin-vue-components/resolvers'
 
 export default defineConfig({
-  base: '/admin/',
+  base: '/admin',
+  publicDir: 'public', // 确保public目录被复制到构建输出
   plugins: [
-    vue(),
+    vue({
+      template: {
+        compilerOptions: {
+          // 优化模板编译
+          hoistStatic: true,
+          cacheHandlers: true
+        }
+      }
+    }),
     AutoImport({
       resolvers: [ElementPlusResolver()],
+      // 自动导入 Vue 相关函数
+      imports: ['vue', 'vue-router'],
+      dts: true
     }),
     Components({
       resolvers: [ElementPlusResolver()],
+      dts: true
     }),
   ],
   server: {
@@ -32,5 +45,16 @@ export default defineConfig({
         }
       }
     }
+  },
+  // 优化依赖预构建
+  optimizeDeps: {
+    include: [
+      'vue',
+      'vue-router',
+      'pinia',
+      'element-plus',
+      'axios',
+      '@element-plus/icons-vue'
+    ]
   }
 })

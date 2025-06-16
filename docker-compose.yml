@@ -9,9 +9,9 @@ services:
     container_name: hqxx-exam-container
     restart: unless-stopped
     ports:
-      - "80:80"
+      - "9203:80"
     volumes:
-      - hqxx-exam-data:/app/data
+      - hqxx-exam-data:/app/data[]
       - hqxx-exam-logs:/var/log
     environment:
       - TZ=Asia/Shanghai

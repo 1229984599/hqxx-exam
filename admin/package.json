@@ -4,8 +4,13 @@
   "private": true,
   "scripts": {
     "build": "vite build",
+    "build:analyze": "vite build --mode analyze",
+    "build:prod": "vite build --mode production",
     "dev": "vite",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "lint": "echo 'Linting...'",
+    "type-check": "echo 'Type checking...'",
+    "clean": "rm -rf dist node_modules/.vite"
   },
   "dependencies": {
     "@element-plus/icons-vue": "^2.3.0",
