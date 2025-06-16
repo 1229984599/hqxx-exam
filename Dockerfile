@@ -105,11 +105,11 @@ RUN chmod +x /app/scripts/start.sh /app/scripts/init_db.sh \
     && chown -R appuser:appuser /app /run/nginx
 
 # 暴露端口
-EXPOSE 80
+EXPOSE 8080
 
 # 健康检查（优化）
 HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
-    CMD curl -f http://localhost/api/health || curl -f http://localhost/ || exit 1
+    CMD curl -f http://localhost:8080/health || curl -f http://localhost:8080/ || exit 1
 
 # 切换到非root用户运行
 USER appuser
