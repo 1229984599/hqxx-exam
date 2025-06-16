@@ -1,0 +1,190 @@
+name: 构建Docker镜像
+
+on:
+  # 手动触发
+  workflow_dispatch:
+    inputs:
+      force_build:
+        description: '强制构建镜像'
+        required: false
+        default: false
+        type: boolean
+      
+  # 当api/pyproject.toml文件变化时触发
+  push:
+    paths:
+      - 'api/pyproject.toml'
+      - 'Dockerfile'
+      - 'api/**'
+      - 'admin/**'
+      - 'home/**'
+      - 'docker/**'
+    branches:
+      - main
+      - master
+      - develop
+
+  # PR时也构建（但不推送）
+  pull_request:
+    paths:
+      - 'api/pyproject.toml'
+      - 'Dockerfile'
+      - 'api/**'
+      - 'admin/**'
+      - 'home/**'
+      - 'docker/**'
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  # 检查版本变化
+  check-version:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.get-version.outputs.version }}
+      version-changed: ${{ steps.check-version.outputs.changed }}
+      should-build: ${{ steps.should-build.outputs.result }}
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: 获取当前版本
+        id: get-version
+        run: |
+          VERSION=$(grep '^version = ' api/pyproject.toml | sed 's/version = "\(.*\)"/\1/')
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "当前版本: $VERSION"
+
+      - name: 检查版本是否变化
+        id: check-version
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "changed=true" >> $GITHUB_OUTPUT
+            echo "手动触发，跳过版本检查"
+          elif [ "${{ github.event_name }}" = "pull_request" ]; then
+            echo "changed=true" >> $GITHUB_OUTPUT
+            echo "PR构建，跳过版本检查"
+          else
+            # 检查pyproject.toml是否在本次提交中被修改
+            if git diff --name-only HEAD~1 HEAD | grep -q "api/pyproject.toml"; then
+              # 检查版本号是否实际发生变化
+              PREV_VERSION=$(git show HEAD~1:api/pyproject.toml | grep '^version = ' | sed 's/version = "\(.*\)"/\1/' || echo "")
+              CURR_VERSION="${{ steps.get-version.outputs.version }}"
+              if [ "$PREV_VERSION" != "$CURR_VERSION" ]; then
+                echo "changed=true" >> $GITHUB_OUTPUT
+                echo "版本从 $PREV_VERSION 变更为 $CURR_VERSION"
+              else
+                echo "changed=false" >> $GITHUB_OUTPUT
+                echo "版本号未变化: $CURR_VERSION"
+              fi
+            else
+              echo "changed=false" >> $GITHUB_OUTPUT
+              echo "pyproject.toml 未被修改"
+            fi
+          fi
+
+      - name: 决定是否构建
+        id: should-build
+        run: |
+          if [ "${{ steps.check-version.outputs.changed }}" = "true" ] || [ "${{ github.event.inputs.force_build }}" = "true" ]; then
+            echo "result=true" >> $GITHUB_OUTPUT
+            echo "将进行Docker镜像构建"
+          else
+            echo "result=false" >> $GITHUB_OUTPUT
+            echo "跳过Docker镜像构建"
+          fi
+
+  # 构建Docker镜像
+  build-docker:
+    needs: check-version
+    if: needs.check-version.outputs.should-build == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+
+      - name: 设置Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: 登录到Container Registry
+        if: github.event_name != 'pull_request'
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: 提取镜像元数据
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            # 使用版本号作为标签
+            type=raw,value=${{ needs.check-version.outputs.version }}
+            # 使用latest标签（仅主分支）
+            type=raw,value=latest,enable={{is_default_branch}}
+            # 使用分支名作为标签
+            type=ref,event=branch
+            # 使用PR号作为标签
+            type=ref,event=pr
+            # 使用commit SHA作为标签
+            type=sha,prefix={{branch}}-
+
+      - name: 构建并推送Docker镜像
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./Dockerfile
+          platforms: linux/amd64,linux/arm64
+          push: ${{ github.event_name != 'pull_request' }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          build-args: |
+            VERSION=${{ needs.check-version.outputs.version }}
+
+      - name: 输出镜像信息
+        run: |
+          echo "## 🐳 Docker镜像构建完成" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**版本号:** ${{ needs.check-version.outputs.version }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**镜像标签:**" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          echo "${{ steps.meta.outputs.tags }}" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          if [ "${{ github.event_name }}" != "pull_request" ]; then
+            echo "**拉取命令:**" >> $GITHUB_STEP_SUMMARY
+            echo '```bash' >> $GITHUB_STEP_SUMMARY
+            echo "docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ needs.check-version.outputs.version }}" >> $GITHUB_STEP_SUMMARY
+            echo '```' >> $GITHUB_STEP_SUMMARY
+          else
+            echo "**注意:** 这是PR构建，镜像未推送到registry" >> $GITHUB_STEP_SUMMARY
+          fi
+
+  # 清理旧镜像（可选）
+  cleanup-old-images:
+    needs: [check-version, build-docker]
+    if: needs.check-version.outputs.should-build == 'true' && github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: 清理旧的未标记镜像
+        uses: actions/delete-package-versions@v4
+        with:
+          package-name: ${{ github.event.repository.name }}
+          package-type: container
+          min-versions-to-keep: 10
+          delete-only-untagged-versions: true
