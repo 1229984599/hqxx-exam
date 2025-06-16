@@ -192,12 +192,19 @@
       @scroll-top="scrollToTop"
     />
 
+    <!-- 图片预览组件 -->
+    <ImagePreview
+      :visible="showImagePreview"
+      :image-src="previewImageSrc"
+      :image-alt="previewImageAlt"
+      @close="closeImagePreview"
+    />
 
   </div>
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, nextTick, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useConfigStore } from '../stores/config'
 import { useQuestionsStore } from '../stores/questions'
@@ -207,6 +214,7 @@ import { useKeyboard, commonKeys } from '../composables/useKeyboard.js'
 import ErrorState from '../components/ErrorState.vue'
 import SkeletonLoader from '../components/SkeletonLoader.vue'
 import FloatingButtons from '../components/FloatingButtons.vue'
+import ImagePreview from '../components/ImagePreview.vue'
 
 
 const router = useRouter()
@@ -216,6 +224,11 @@ const { registerKey } = useKeyboard()
 
 const showAnswer = ref(false)
 const favoriteQuestions = ref(new Set())
+
+// 图片预览相关
+const showImagePreview = ref(false)
+const previewImageSrc = ref('')
+const previewImageAlt = ref('')
 
 // 计算当前题目是否已收藏
 const isFavorited = computed(() => {
@@ -275,6 +288,8 @@ const getRandomQuestion = () => {
 const getRandomQuestionAndScrollTop = () => {
   getRandomQuestion()
   scrollToTop()
+  // 重新设置图片点击事件
+  setupImageClickEvents()
 }
 
 // 返回首页
@@ -508,10 +523,51 @@ const getQuestionTypeText = (type) => {
   return typeMap[type] || type
 }
 
+// 图片预览功能
+const openImagePreview = (imageSrc, imageAlt = '') => {
+  previewImageSrc.value = imageSrc
+  previewImageAlt.value = imageAlt
+  showImagePreview.value = true
+}
+
+const closeImagePreview = () => {
+  showImagePreview.value = false
+  previewImageSrc.value = ''
+  previewImageAlt.value = ''
+}
+
+// 设置图片点击事件
+const setupImageClickEvents = () => {
+  nextTick(() => {
+    // 为试题内容中的图片添加点击事件
+    const contentImages = document.querySelectorAll('.question-content img')
+    contentImages.forEach(img => {
+      img.style.cursor = 'pointer'
+      img.addEventListener('click', (event) => {
+        event.preventDefault()
+        openImagePreview(img.src, img.alt)
+      })
+    })
+  })
+}
+
+// 监听当前试题变化，重新设置图片点击事件
+watch(() => questionsStore.currentQuestion, () => {
+  setupImageClickEvents()
+}, { flush: 'post' })
+
+// 监听答案显示状态变化，重新设置图片点击事件
+watch(showAnswer, () => {
+  setupImageClickEvents()
+}, { flush: 'post' })
+
 // 组件挂载时检查试题
 onMounted(() => {
   initializeQuestions()
   loadFavoritesFromStorage()
+
+  // 设置图片点击事件
+  setupImageClickEvents()
 
   // 注册键盘快捷键
   registerKey(commonKeys.SPACE, () => {
@@ -545,6 +601,7 @@ onMounted(() => {
   registerKey(commonKeys.ESCAPE, () => {
     router.push('/')
   })
+  scrollToTop()
 })
 </script>
 
@@ -559,6 +616,14 @@ onMounted(() => {
   border-radius: 12px;
   margin: 16px 0;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.question-content :deep(img:hover) {
+  transform: scale(1.02);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+  filter: brightness(1.05);
 }
 
 .question-content :deep(p) {

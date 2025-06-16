@@ -45,6 +45,18 @@
             <el-tag size="small" type="info" class="code-tag">{{ row.code }}</el-tag>
           </template>
         </el-table-column>
+        <el-table-column prop="start_date" label="开始时间" width="120" align="center">
+          <template #default="{ row }">
+            <span v-if="row.start_date" class="date-text">{{ row.start_date }}</span>
+            <span v-else class="text-gray-400">未设置</span>
+          </template>
+        </el-table-column>
+        <el-table-column prop="end_date" label="结束时间" width="120" align="center">
+          <template #default="{ row }">
+            <span v-if="row.end_date" class="date-text">{{ row.end_date }}</span>
+            <span v-else class="text-gray-400">未设置</span>
+          </template>
+        </el-table-column>
         <el-table-column prop="sort_order" label="排序" width="100" align="center">
           <template #default="{ row }">
             <el-tag size="small" type="primary">{{ row.sort_order }}</el-tag>
@@ -73,13 +85,39 @@
           <el-input v-model="form.code" placeholder="请输入学期代码"/>
         </el-form-item>
 
-        <el-form-item label="排序" prop="sort_order">
-          <el-input-number v-model="form.sort_order" :min="0"/>
-        </el-form-item>
+        <div class="form-row">
+          <el-form-item label="开始时间" prop="start_date" class="form-item-half">
+            <el-date-picker
+              v-model="form.start_date"
+              type="date"
+              placeholder="选择开始日期"
+              format="YYYY-MM-DD"
+              value-format="YYYY-MM-DD"
+              style="width: 100%"
+            />
+          </el-form-item>
 
-        <el-form-item label="状态" prop="is_active">
-          <el-switch v-model="form.is_active"/>
-        </el-form-item>
+          <el-form-item label="结束时间" prop="end_date" class="form-item-half">
+            <el-date-picker
+              v-model="form.end_date"
+              type="date"
+              placeholder="选择结束日期"
+              format="YYYY-MM-DD"
+              value-format="YYYY-MM-DD"
+              style="width: 100%"
+            />
+          </el-form-item>
+        </div>
+
+        <div class="form-row">
+          <el-form-item label="排序" prop="sort_order" class="form-item-half">
+            <el-input-number v-model="form.sort_order" :min="0" style="width: 100%"/>
+          </el-form-item>
+
+          <el-form-item label="状态" prop="is_active" class="form-item-half">
+            <el-switch v-model="form.is_active"/>
+          </el-form-item>
+        </div>
 
         <el-form-item label="描述" prop="description">
           <el-input
@@ -190,6 +228,8 @@ const crud = useCrud('/semesters/', {
   defaultForm: {
     name: '',
     code: '',
+    start_date: null,
+    end_date: null,
     sort_order: 0,
     is_active: true,
     description: ''
@@ -208,7 +248,31 @@ const crud = useCrud('/semesters/', {
 // 表单验证规则
 const rules = {
   name: commonRules.title,
-  code: commonRules.code
+  code: commonRules.code,
+  start_date: [
+    {
+      validator: (rule, value, callback) => {
+        if (value && crud.form.end_date && new Date(value) > new Date(crud.form.end_date)) {
+          callback(new Error('开始时间不能晚于结束时间'))
+        } else {
+          callback()
+        }
+      },
+      trigger: 'change'
+    }
+  ],
+  end_date: [
+    {
+      validator: (rule, value, callback) => {
+        if (value && crud.form.start_date && new Date(value) < new Date(crud.form.start_date)) {
+          callback(new Error('结束时间不能早于开始时间'))
+        } else {
+          callback()
+        }
+      },
+      trigger: 'change'
+    }
+  ]
 }
 
 // 组件引用
@@ -326,6 +390,32 @@ crud.loadData()
 
 .date-text {
   color: #718096;
-  font-size: 13px;
+  font-size: 12px;
+  font-family: 'Courier New', monospace;
+}
+
+.status-active {
+  color: var(--el-color-success);
+  font-weight: 500;
+}
+
+.status-inactive {
+  color: var(--el-color-info);
+}
+
+.form-row {
+  display: flex;
+  gap: 16px;
+  width: 100%;
+}
+
+.form-item-half {
+  flex: 1;
+}
+
+.text-gray-400 {
+  color: #9ca3af;
+  font-style: italic;
+  font-size: 12px;
 }
 </style>

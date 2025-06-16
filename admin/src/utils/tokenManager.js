@@ -187,7 +187,7 @@ class TokenManager {
   /**
    * 启动定时检查
    */
-  startPeriodicCheck(api, getTokenCallback, intervalMs = 60000) { // 默认每分钟检查一次
+  startPeriodicCheck(api, getTokenCallback, updateTokenCallback, intervalMs = 60000) { // 默认每分钟检查一次
     if (this.checkInterval) {
       clearInterval(this.checkInterval)
     }
@@ -200,10 +200,12 @@ class TokenManager {
         const currentToken = getTokenCallback()
         const result = await this.checkAndRefreshToken(api, currentToken)
 
-        // 如果返回了新token，需要通知外部更新
+        // 如果返回了新token，通知外部更新
         if (typeof result === 'string') {
-          console.log('Token已刷新，需要外部更新')
-          // 这里可以通过事件或回调通知外部更新token
+          console.log('🔄 Token已自动刷新，更新到store中')
+          if (updateTokenCallback && typeof updateTokenCallback === 'function') {
+            updateTokenCallback(result)
+          }
         }
       } catch (error) {
         console.error('定时token检查失败:', error)
@@ -220,6 +222,7 @@ class TokenManager {
     if (this.checkInterval) {
       clearInterval(this.checkInterval)
       this.checkInterval = null
+      this.getTokenCallback = null
       console.log('⏹️ 停止token定时检查')
     }
   }

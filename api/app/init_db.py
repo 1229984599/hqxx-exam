@@ -123,10 +123,10 @@ async def init_db():
                         "content": "<p>请读出下面的拼音：<br><strong>ba  bi  bu  bo</strong></p>",
                         "answer": "ba读作巴，bi读作比，bu读作不，bo读作波",
                         "difficulty": 1,
-                        "semester_id": semester.id,
-                        "grade_id": grade.id,
-                        "subject_id": chinese.id,
-                        "category_id": pinyin_cat.id,
+                        "semester": semester,
+                        "grade": grade,
+                        "subject": chinese,
+                        "category": pinyin_cat,
                         "is_published": True
                     },
                     {

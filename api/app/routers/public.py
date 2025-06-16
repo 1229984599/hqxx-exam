@@ -2,6 +2,8 @@
 公开API路由 - 供前台页面使用，无需认证
 """
 import random
+import logging
+from datetime import date
 from typing import List, Optional
 from fastapi import APIRouter, HTTPException, Query, Response
 from fastapi.responses import JSONResponse
@@ -10,39 +12,11 @@ from app.models.semester import Semester
 from app.models.grade import Grade
 from app.models.subject import Subject
 from app.models.category import Category
-import json
-import hashlib
+from app.core.cache import cache_manager
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/public", tags=["公开接口"])
-
-# 简单的内存缓存
-_cache = {}
-_cache_ttl = {}
-
-def get_cache_key(endpoint: str, params: dict) -> str:
-    """生成缓存键"""
-    cache_data = f"{endpoint}:{json.dumps(params, sort_keys=True)}"
-    return hashlib.md5(cache_data.encode()).hexdigest()
-
-def get_from_cache(cache_key: str):
-    """从缓存获取数据"""
-    import time
-    if cache_key in _cache:
-        if cache_key in _cache_ttl and time.time() < _cache_ttl[cache_key]:
-            return _cache[cache_key]
-        else:
-            # 缓存过期，清理
-            if cache_key in _cache:
-                del _cache[cache_key]
-            if cache_key in _cache_ttl:
-                del _cache_ttl[cache_key]
-    return None
-
-def set_cache(cache_key: str, data, ttl_seconds: int = 300):
-    """设置缓存数据，默认5分钟过期"""
-    import time
-    _cache[cache_key] = data
-    _cache_ttl[cache_key] = time.time() + ttl_seconds
 
 def add_cache_headers(response: Response, cache_seconds: int = 300):
     """添加缓存头"""
@@ -50,23 +24,86 @@ def add_cache_headers(response: Response, cache_seconds: int = 300):
     response.headers["ETag"] = f'"{hash(str(response.body))}"'
 
 
+def is_semester_active_by_time(semester) -> bool:
+    """检查学期是否在有效时间范围内"""
+    if not semester:
+        return False
+
+    today = date.today()
+
+    # 如果没有设置开始和结束时间，认为始终有效（向后兼容）
+    if not semester.start_date and not semester.end_date:
+        return True
+
+    # 如果只设置了开始时间
+    if semester.start_date and not semester.end_date:
+        return today >= semester.start_date
+
+    # 如果只设置了结束时间
+    if not semester.start_date and semester.end_date:
+        return today <= semester.end_date
+
+    # 如果都设置了，检查是否在范围内
+    return semester.start_date <= today <= semester.end_date
+
+
+async def validate_semester_time(semester_id: int) -> dict:
+    """验证学期时间有效性，返回验证结果和消息"""
+    if not semester_id:
+        logger.warning(f"学期时间验证失败：未指定学期ID")
+        return {"valid": False, "message": "未指定学期"}
+
+    semester = await Semester.filter(id=semester_id, is_active=True).first()
+    if not semester:
+        logger.warning(f"学期时间验证失败：学期 {semester_id} 不存在或已停用")
+        return {"valid": False, "message": "学期不存在或已停用"}
+
+    if not is_semester_active_by_time(semester):
+        today = date.today()
+        if semester.start_date and today < semester.start_date:
+            logger.info(f"学期 {semester_id}({semester.name}) 尚未开始，当前日期：{today}，开始日期：{semester.start_date}")
+            return {
+                "valid": False,
+                "message": f"学期尚未开始，开始时间：{semester.start_date}",
+                "code": "SEMESTER_NOT_STARTED"
+            }
+        elif semester.end_date and today > semester.end_date:
+            logger.info(f"学期 {semester_id}({semester.name}) 已结束，当前日期：{today}，结束日期：{semester.end_date}")
+            return {
+                "valid": False,
+                "message": f"学期已结束，结束时间：{semester.end_date}",
+                "code": "SEMESTER_ENDED"
+            }
+        else:
+            logger.warning(f"学期 {semester_id}({semester.name}) 时间范围无效，当前日期：{today}")
+            return {
+                "valid": False,
+                "message": "学期不在有效时间范围内",
+                "code": "SEMESTER_INVALID_TIME"
+            }
+
+    logger.debug(f"学期 {semester_id}({semester.name}) 时间验证通过")
+    return {"valid": True, "message": "学期时间有效"}
+
+
 @router.get("/semesters/", summary="获取学期列表（公开）")
 async def get_public_semesters(
     response: Response,
     is_active: bool = Query(True, description="是否激活"),
+    only_active_time: bool = Query(False, description="只返回时间范围内的学期"),
     skip: int = Query(0, ge=0, description="跳过数量"),
     limit: int = Query(100, ge=1, le=100, description="限制数量")
 ):
     """获取学期列表 - 公开接口"""
-    # 生成缓存键
-    cache_key = get_cache_key("semesters", {
-        "is_active": is_active,
-        "skip": skip,
-        "limit": limit
-    })
-
     # 尝试从缓存获取
-    cached_data = get_from_cache(cache_key)
+    cache_params = {
+        "is_active": is_active,
+        "only_active_time": only_active_time,
+        "skip": skip,
+        "limit": limit,
+        "date": date.today().isoformat() if only_active_time else None
+    }
+    cached_data = cache_manager.get("semesters", cache_params)
     if cached_data:
         add_cache_headers(response, 300)
         return cached_data
@@ -75,25 +112,68 @@ async def get_public_semesters(
     query = Semester.filter(is_active=is_active)
     semesters = await query.offset(skip).limit(limit).order_by("sort_order", "id")
 
+    # 如果需要过滤时间范围，则进行过滤
+    if only_active_time:
+        semesters = [s for s in semesters if is_semester_active_by_time(s)]
+
     result = [
         {
             "id": semester.id,
             "name": semester.name,
             "code": semester.code,
-            "start_date": semester.start_date,
-            "end_date": semester.end_date,
+            "start_date": semester.start_date.isoformat() if semester.start_date else None,
+            "end_date": semester.end_date.isoformat() if semester.end_date else None,
             "is_active": semester.is_active,
             "sort_order": semester.sort_order,
-            "description": semester.description
+            "description": semester.description,
+            "is_time_active": is_semester_active_by_time(semester)
         }
         for semester in semesters
     ]
 
     # 设置缓存
-    set_cache(cache_key, result, 300)  # 5分钟缓存
+    cache_manager.set("semesters", cache_params, result, 300)  # 5分钟缓存
     add_cache_headers(response, 300)
 
     return result
+
+
+@router.get("/semesters/{semester_id}/status", summary="检查学期状态（公开）")
+async def check_semester_status(semester_id: int):
+    """检查学期状态 - 公开接口"""
+    semester_validation = await validate_semester_time(semester_id)
+
+    if semester_validation["valid"]:
+        semester = await Semester.filter(id=semester_id, is_active=True).first()
+        if not semester:
+            return {
+                "valid": False,
+                "message": "学期不存在或已停用",
+                "code": "SEMESTER_NOT_FOUND"
+            }
+
+        # 检查是否即将过期（3天内）
+        warning_message = None
+        if semester.end_date:
+            today = date.today()
+            days_until_end = (semester.end_date - today).days
+            if 0 <= days_until_end <= 3:
+                warning_message = f"学期将在 {days_until_end} 天后结束，请抓紧时间完成练习"
+
+        return {
+            "valid": True,
+            "message": "学期时间有效",
+            "semester": {
+                "id": semester.id,
+                "name": semester.name,
+                "code": semester.code,
+                "start_date": semester.start_date.isoformat() if semester.start_date else None,
+                "end_date": semester.end_date.isoformat() if semester.end_date else None
+            },
+            "warning": warning_message
+        }
+    else:
+        return semester_validation
 
 
 @router.get("/grades/", summary="获取年级列表（公开）")
@@ -104,15 +184,13 @@ async def get_public_grades(
     limit: int = Query(100, ge=1, le=100, description="限制数量")
 ):
     """获取年级列表 - 公开接口"""
-    # 生成缓存键
-    cache_key = get_cache_key("grades", {
+    # 尝试从缓存获取
+    cache_params = {
         "is_active": is_active,
         "skip": skip,
         "limit": limit
-    })
-
-    # 尝试从缓存获取
-    cached_data = get_from_cache(cache_key)
+    }
+    cached_data = cache_manager.get("grades", cache_params)
     if cached_data:
         add_cache_headers(response, 300)
         return cached_data
@@ -135,7 +213,7 @@ async def get_public_grades(
     ]
 
     # 设置缓存
-    set_cache(cache_key, result, 300)  # 5分钟缓存
+    cache_manager.set("grades", cache_params, result, 300)  # 5分钟缓存
     add_cache_headers(response, 300)
 
     return result
@@ -203,6 +281,19 @@ async def get_public_random_question(
     exclude_ids: str = Query(None, description="排除的题目ID列表，逗号分隔")
 ):
     """随机获取一道试题 - 公开接口"""
+
+    # 验证学期时间有效性
+    semester_validation = await validate_semester_time(semester_id)
+    if not semester_validation["valid"]:
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "message": semester_validation["message"],
+                "code": semester_validation.get("code", "SEMESTER_INVALID"),
+                "type": "semester_time_error"
+            }
+        )
+
     query = Question.filter(
         semester_id=semester_id,
         grade_id=grade_id,
@@ -286,6 +377,20 @@ async def get_public_questions(
     limit: int = Query(20, ge=1, le=1000, description="限制数量")
 ):
     """获取试题列表 - 公开接口，只返回已发布的试题"""
+
+    # 如果指定了学期ID，先验证学期时间有效性
+    if semester_id is not None:
+        semester_validation = await validate_semester_time(semester_id)
+        if not semester_validation["valid"]:
+            raise HTTPException(
+                status_code=400,
+                detail={
+                    "message": semester_validation["message"],
+                    "code": semester_validation.get("code", "SEMESTER_INVALID"),
+                    "type": "semester_time_error"
+                }
+            )
+
     query = Question.filter(
         is_active=True,
         is_published=True

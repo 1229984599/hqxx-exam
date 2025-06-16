@@ -1,5 +1,5 @@
 <template>
-  <PageLayout :title="isEdit ? '编辑模板' : '添加模板'">
+  <PageLayout :title="isEdit ? '编辑模板' : '添加模板'" route-name="templates">
     <div class="template-form-container">
       <el-form
         ref="formRef"

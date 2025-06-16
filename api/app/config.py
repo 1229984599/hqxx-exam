@@ -11,7 +11,7 @@ class Settings(BaseSettings):
     # JWT配置
     SECRET_KEY: str = "hqxx-exam-secret-key"
     ALGORITHM: str = "HS256"
-    ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 300
     
     # Redis配置
     REDIS_URL: Optional[str] = None

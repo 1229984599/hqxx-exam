@@ -2,10 +2,12 @@
   <div class="page-layout">
     <!-- 页面头部 -->
     <div class="page-header">
-      <div class="header-left">
+      <router-link :to="{
+        name: routeName
+      }" class="header-left">
         <h1 class="page-title">{{ title }}</h1>
         <p v-if="subtitle" class="page-subtitle">{{ subtitle }}</p>
-      </div>
+      </router-link>
       <div class="header-right">
         <slot name="actions"></slot>
       </div>
@@ -30,6 +32,10 @@ defineProps({
     required: true
   },
   subtitle: {
+    type: String,
+    default: ''
+  },
+  routeName: {
     type: String,
     default: ''
   }
@@ -59,6 +65,7 @@ defineProps({
 }
 
 .header-left {
+  text-decoration: none;
   flex: 1;
 }
 

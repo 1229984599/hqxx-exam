@@ -9,6 +9,7 @@ import App from './App.vue'
 import router from './router'
 import './styles/global.css'
 import { permissionDirective, roleDirective } from './composables/usePermissions'
+import { setAuthStore } from './utils/api'
 
 const app = createApp(App)
 const pinia = createPinia()
@@ -35,6 +36,9 @@ app.use(ElementPlus)
 app.directive('permission', permissionDirective)
 app.directive('role', roleDirective)
 
-
+// 设置auth store到API模块（在pinia初始化后）
+import { useAuthStore } from './stores/auth'
+const authStore = useAuthStore()
+setAuthStore(authStore)
 
 app.mount('#app')

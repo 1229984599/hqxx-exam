@@ -65,7 +65,7 @@ const cachedApiCall = (endpoint, params = {}, ttl = 5 * 60 * 1000) => {
 // API方法 - 使用公开接口和缓存
 export const apiService = {
   // 获取学期列表（缓存5分钟）
-  getSemesters: (params = {}) => cachedApiCall('/public/semesters/', params, 5 * 60 * 1000),
+  getSemesters: (params = {}) => cachedApiCall('/public/semesters/', { only_active_time: true, ...params }, 5 * 60 * 1000),
 
   // 获取年级列表（缓存5分钟）
   getGrades: (params = {}) => cachedApiCall('/public/grades/', params, 5 * 60 * 1000),
@@ -83,7 +83,10 @@ export const apiService = {
   getRandomQuestion: (params = {}) => api.get('/public/questions/random', { params }),
 
   // 获取试题详情（暂时保留原路径，如需要可以添加到公开接口）
-  getQuestion: (id) => api.get(`/questions/${id}`)
+  getQuestion: (id) => api.get(`/questions/${id}`),
+
+  // 检查学期状态（不缓存，确保实时性）
+  checkSemesterStatus: (semesterId) => api.get(`/public/semesters/${semesterId}/status`)
 }
 
 // 缓存管理工具

@@ -2,6 +2,20 @@ import axios from 'axios'
 import { ElMessage } from 'element-plus'
 import tokenManager from './tokenManager'
 
+// 全局变量存储auth store实例
+let authStoreInstance = null
+
+// 设置auth store实例（由main.js调用）
+export function setAuthStore(store) {
+  authStoreInstance = store
+  console.log('🔗 Auth store已设置到API模块')
+}
+
+// 获取auth store实例
+const getAuthStore = () => {
+  return authStoreInstance
+}
+
 const api = axios.create({
   baseURL: '/api/v1',
   timeout: 10000,
@@ -13,20 +27,33 @@ const api = axios.create({
 // 请求拦截器
 api.interceptors.request.use(
   config => {
-    // 从localStorage直接获取token（避免循环依赖）
+    // 优先从auth store获取token，回退到localStorage
     try {
-      const authData = localStorage.getItem('auth-store')
-      if (authData) {
-        const parsedData = JSON.parse(authData)
-        const token = parsedData.token
-        if (token) {
-          config.headers.Authorization = `Bearer ${token}`
-          console.log('✅ Token已添加到请求头')
-        } else {
-          console.warn('⚠️ 未找到token')
-        }
+      const store = getAuthStore()
+      let token = null
+      let tokenSource = ''
+
+      if (store && store.token) {
+        // 从auth store获取token（推荐方式）
+        token = store.token
+        tokenSource = 'auth-store'
+        console.log('✅ 从auth-store获取token')
       } else {
-        console.warn('⚠️ 未找到认证数据')
+        // 回退到localStorage方式（兼容性）
+        const authData = localStorage.getItem('auth-store')
+        if (authData) {
+          const parsedData = JSON.parse(authData)
+          token = parsedData.token
+          tokenSource = 'localStorage'
+          console.log('⚠️ 从localStorage获取token（回退方式）')
+        }
+      }
+
+      if (token) {
+        config.headers.Authorization = `Bearer ${token}`
+        console.log(`✅ Token已添加到请求头 (来源: ${tokenSource})`)
+      } else {
+        console.warn('⚠️ 未找到token')
       }
     } catch (error) {
       console.error('❌ 获取token失败:', error)

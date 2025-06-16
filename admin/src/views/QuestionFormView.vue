@@ -1,6 +1,7 @@
 <template>
   <PageLayout
     :title="isEdit ? '编辑试题' : '添加试题'"
+    route-name="questions"
   >
     <QuestionForm
       ref="questionFormRef"

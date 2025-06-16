@@ -4,7 +4,7 @@ import { findMenuByRoute } from '../utils/menuConfig'
 import { ElMessage } from 'element-plus'
 
 const router = createRouter({
-  history: createWebHistory(import.meta.env.BASE_URL),
+  history: createWebHistory('/admin/'),
   routes: [
     {
       path: '/login',

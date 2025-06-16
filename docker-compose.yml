@@ -1,0 +1,38 @@
+version: '3.8'
+
+services:
+  hqxx-exam:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: hqxx-exam:latest
+    container_name: hqxx-exam-container
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    volumes:
+      - hqxx-exam-data:/app/data
+      - hqxx-exam-logs:/var/log
+    environment:
+      - TZ=Asia/Shanghai
+      - PYTHONUNBUFFERED=1
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.hqxx-exam.rule=Host(`exam.example.com`)"
+      - "traefik.http.services.hqxx-exam.loadbalancer.server.port=80"
+
+volumes:
+  hqxx-exam-data:
+    driver: local
+  hqxx-exam-logs:
+    driver: local
+
+networks:
+  default:
+    name: hqxx-exam-network

@@ -374,6 +374,7 @@ import { Reading, Delete, Close, DocumentAdd, Search, Loading, Check, Warning } 
 import { pinyin } from 'pinyin-pro'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import api from '../utils/api'
+import { useAuthStore } from '../stores/auth'
 
 const props = defineProps({
   modelValue: {
@@ -402,11 +403,18 @@ const props = defineProps({
   },
   apiKey: {
     type: String,
-    default: 'no-api-key' // 使用免费版本
+    default: 'gpl' // 使用免费版本
+  },
+  autoStyleImages: {
+    type: Boolean,
+    default: true // 默认自动应用图片样式
   }
 })
 
 const emit = defineEmits(['update:modelValue'])
+
+// 获取auth store
+const authStore = useAuthStore()
 
 const content = ref('')
 const selectedText = ref('')
@@ -735,7 +743,7 @@ const editorConfig = computed(() => ({
     'insertdatetime', 'media', 'table', 'wordcount',
     'autosave', 'directionality', 'nonbreaking', 'pagebreak'
   ],
-  toolbar: 'responsivepreview contentstats | undo redo | blocks fontsize fontsizeplus fontsizeminus lineheight | bold italic underline strikethrough | alignleft aligncenter alignright alignjustify | outdent indent | numlist bullist | forecolor backcolor | link image table | quicksymbols | addpinyin removepinyin smartpinyin | inserttemplate | code | fullscreen',
+  toolbar: 'responsivepreview contentstats | undo redo | blocks fontsize fontsizeplus fontsizeminus lineheight | bold italic underline strikethrough | alignleft aligncenter alignright alignjustify | outdent indent | numlist bullist | forecolor backcolor | link image styleimages table | quicksymbols | addpinyin removepinyin smartpinyin | inserttemplate | code | fullscreen',
   toolbar_mode: props.toolbarMode,
 
   // 右键菜单
@@ -755,6 +763,32 @@ const editorConfig = computed(() => ({
       font-size: 14px;
       line-height: 2.5;
       margin: 1rem;
+    }
+
+    /* 图片默认样式 - 宽度100%，高度自适应 */
+    .mce-content-body img {
+      width: 100%;
+      height: auto;
+      max-width: 100%;
+      display: block;
+      margin: 10px auto;
+      border-radius: 8px;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+      transition: all 0.3s ease;
+    }
+
+    /* 图片悬停效果 */
+    .mce-content-body img:hover {
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+      transform: translateY(-1px);
+    }
+
+    /* 响应式图片 - 确保在小屏幕上也能正确显示 */
+    @media (max-width: 768px) {
+      .mce-content-body img {
+        margin: 8px auto;
+        border-radius: 6px;
+      }
     }
     ruby {
       ruby-align: center;
@@ -956,10 +990,23 @@ const editorConfig = computed(() => ({
         formData.append('image', blobInfo.blob(), blobInfo.filename())
         formData.append('folder', 'tinymce')
 
+        // 获取token - 优先从auth store，回退到localStorage
+        let token = null
+        if (authStore.token) {
+          token = authStore.token
+        } else {
+          // 回退方式：从localStorage获取
+          const authData = localStorage.getItem('auth-store')
+          if (authData) {
+            const parsedData = JSON.parse(authData)
+            token = parsedData.token
+          }
+        }
+
         const response = await fetch('/api/v1/upload/image', {
           method: 'POST',
           headers: {
-            'Authorization': `Bearer ${localStorage.getItem('admin_token')}`
+            'Authorization': `Bearer ${token}`
           },
           body: formData
         })
@@ -1127,6 +1174,13 @@ const editorConfig = computed(() => ({
       onAction: () => openResponsivePreview()
     })
 
+    // 添加图片样式按钮
+    editor.ui.registry.addButton('styleimages', {
+      text: '🖼️ 图片样式',
+      tooltip: '为所有图片应用响应式样式（宽度100%，高度自适应）',
+      onAction: () => styleAllImages()
+    })
+
     editor.on('init', () => {
       console.log('TinyMCE 编辑器初始化完成')
     })
@@ -1175,6 +1229,76 @@ const editorConfig = computed(() => ({
         e.preventDefault()
         showPinyinContextMenu(target.closest('ruby.pinyin-ruby'), e, editor)
       }
+    })
+
+    // 图片样式应用函数
+    const applyImageStyles = (images, showMessage = false) => {
+      if (!props.autoStyleImages) return
+
+      let styledCount = 0
+      images.forEach(img => {
+        if (!img.hasAttribute('data-styled')) {
+          // 设置图片样式：宽度100%，高度自适应
+          img.style.width = '100%'
+          img.style.height = 'auto'
+          img.style.maxWidth = '100%'
+          img.style.display = 'block'
+          img.style.margin = '10px auto'
+          img.style.borderRadius = '8px'
+          img.style.boxShadow = '0 2px 8px rgba(0, 0, 0, 0.1)'
+          img.style.transition = 'all 0.3s ease'
+
+          // 标记已处理，避免重复设置
+          img.setAttribute('data-styled', 'true')
+          styledCount++
+        }
+      })
+
+      // 显示用户反馈
+      if (showMessage && styledCount > 0) {
+        ElMessage.success(`已为 ${styledCount} 张图片应用响应式样式`)
+      }
+    }
+
+    // 监听图片插入事件，自动设置样式
+    editor.on('NodeChange', (e) => {
+      const images = editor.getBody().querySelectorAll('img:not([data-styled])')
+      if (images.length > 0) {
+        applyImageStyles(images)
+      }
+    })
+
+    // 监听内容变化，处理粘贴的图片
+    editor.on('SetContent', (e) => {
+      // 延迟处理，确保内容已完全插入
+      setTimeout(() => {
+        const images = editor.getBody().querySelectorAll('img:not([data-styled])')
+        if (images.length > 0) {
+          applyImageStyles(images, true)
+        }
+      }, 100)
+    })
+
+    // 监听命令执行，处理通过工具栏插入的图片
+    editor.on('ExecCommand', (e) => {
+      if (e.command === 'mceImage' || e.command === 'mceInsertContent') {
+        setTimeout(() => {
+          const images = editor.getBody().querySelectorAll('img:not([data-styled])')
+          if (images.length > 0) {
+            applyImageStyles(images, true)
+          }
+        }, 200)
+      }
+    })
+
+    // 监听粘贴事件
+    editor.on('paste', (e) => {
+      setTimeout(() => {
+        const images = editor.getBody().querySelectorAll('img:not([data-styled])')
+        if (images.length > 0) {
+          applyImageStyles(images, true)
+        }
+      }, 300)
     })
   }
 }))
@@ -2085,6 +2209,42 @@ function getTemplatePreview(content) {
 // 插入模板（保留原函数作为兼容）
 async function insertTemplate() {
   await openTemplateDialog()
+}
+
+// 为所有图片应用样式
+const styleAllImages = () => {
+  if (!editorInstance.value) {
+    ElMessage.warning('编辑器未初始化')
+    return
+  }
+
+  const allImages = editorInstance.value.getBody().querySelectorAll('img')
+  if (allImages.length === 0) {
+    ElMessage.info('当前内容中没有图片')
+    return
+  }
+
+  // 移除所有图片的 data-styled 标记，强制重新应用样式
+  allImages.forEach(img => {
+    img.removeAttribute('data-styled')
+  })
+
+  // 应用样式
+  let styledCount = 0
+  allImages.forEach(img => {
+    img.style.width = '100%'
+    img.style.height = 'auto'
+    img.style.maxWidth = '100%'
+    img.style.display = 'block'
+    img.style.margin = '10px auto'
+    img.style.borderRadius = '8px'
+    img.style.boxShadow = '0 2px 8px rgba(0, 0, 0, 0.1)'
+    img.style.transition = 'all 0.3s ease'
+    img.setAttribute('data-styled', 'true')
+    styledCount++
+  })
+
+  ElMessage.success(`已为 ${styledCount} 张图片应用响应式样式`)
 }
 
 

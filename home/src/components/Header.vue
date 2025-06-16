@@ -16,7 +16,7 @@
             </div>
             <div class="flex flex-col">
               <span class="text-xl font-bold tracking-tight">红旗小学</span>
-              <span class="text-xs opacity-80 font-medium">考试练习系统</span>
+              <span class="text-xs opacity-80 font-medium">无纸化测评系统</span>
             </div>
           </router-link>
         </div>

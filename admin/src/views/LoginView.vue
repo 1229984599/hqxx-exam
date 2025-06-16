@@ -2,7 +2,7 @@
   <div class="login-container">
     <div class="login-card">
       <div class="login-header">
-        <img src="E:/code/hqxx-exam/logo.png" alt="红旗小学" class="logo" />
+        <img src="/logo.png" alt="红旗小学" class="logo" />
         <h1 class="title">红旗小学考试系统</h1>
         <p class="subtitle">管理后台</p>
       </div>

@@ -23,7 +23,7 @@
         </span>
         <br>
         <span class="bg-gradient-to-r from-gray-700 to-gray-900 bg-clip-text text-transparent">
-          考试系统
+          无纸化测评系统
         </span>
       </h1>
 
@@ -68,6 +68,39 @@
         </div>
       </div>
         
+        <!-- 学期状态提示 -->
+        <div v-if="configStore.semesterStatusMessage" class="mb-6 p-4 rounded-lg border-l-4" :class="{
+          'bg-yellow-50 border-yellow-400': configStore.semesterStatusMessage.type === 'warning',
+          'bg-red-50 border-red-400': configStore.semesterStatusMessage.type === 'error'
+        }">
+          <div class="flex items-center">
+            <svg v-if="configStore.semesterStatusMessage.type === 'warning'" class="h-5 w-5 text-yellow-400 mr-2" fill="currentColor" viewBox="0 0 20 20">
+              <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd"></path>
+            </svg>
+            <svg v-else-if="configStore.semesterStatusMessage.type === 'error'" class="h-5 w-5 text-red-400 mr-2" fill="currentColor" viewBox="0 0 20 20">
+              <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd"></path>
+            </svg>
+            <p class="text-sm font-medium" :class="{
+              'text-yellow-800': configStore.semesterStatusMessage.type === 'warning',
+              'text-red-800': configStore.semesterStatusMessage.type === 'error'
+            }">
+              {{ configStore.semesterStatusMessage.message }}
+            </p>
+          </div>
+        </div>
+
+        <!-- 学期警告提示 -->
+        <div v-if="semesterWarning" class="mb-6 p-4 rounded-lg border-l-4 bg-orange-50 border-orange-400">
+          <div class="flex items-center">
+            <svg class="h-5 w-5 text-orange-400 mr-2" fill="currentColor" viewBox="0 0 20 20">
+              <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd"></path>
+            </svg>
+            <p class="text-sm font-medium text-orange-800">
+              {{ semesterWarning.message }}
+            </p>
+          </div>
+        </div>
+
         <!-- 配置表单 -->
         <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-4 gap-6 lg:gap-8 config-grid-mobile">
           <!-- 学期选择 -->
@@ -82,9 +115,10 @@
               <select
                 v-model="configStore.selectedSemester"
                 class="select-modern w-full"
-                :disabled="configStore.loading"
+                :disabled="configStore.loading || !configStore.hasValidSemesters"
+                @change="onSemesterChange"
               >
-                <option value="">请选择学期</option>
+                <option value="">{{ configStore.hasValidSemesters ? '请选择学期' : '暂无可用学期' }}</option>
                 <option
                   v-for="semester in configStore.semesters"
                   :key="semester.id"
@@ -315,6 +349,7 @@ const questionsStore = useQuestionsStore()
 
 const loading = ref(false)
 const error = ref(false)
+const semesterWarning = ref(null)
 
 // 重试加载配置
 const retryLoadConfig = async () => {
@@ -325,6 +360,28 @@ const retryLoadConfig = async () => {
     console.error('重试加载配置失败:', err)
     error.value = true
     message.error('重试失败，请稍后再试')
+  }
+}
+
+// 监听学期变化，检查学期状态
+const onSemesterChange = async () => {
+  semesterWarning.value = null
+
+  if (configStore.selectedSemester) {
+    try {
+      const { apiService } = await import('../utils/api.js')
+      const statusResult = await apiService.checkSemesterStatus(configStore.selectedSemester)
+
+      if (statusResult.warning) {
+        semesterWarning.value = {
+          type: 'warning',
+          message: statusResult.warning
+        }
+      }
+    } catch (err) {
+      console.error('检查学期状态失败:', err)
+      // 不显示错误，避免干扰用户体验
+    }
   }
 }
 
@@ -373,12 +430,19 @@ const startPractice = async () => {
 
     // 检查是否有试题
     if (!questionsStore.hasQuestions) {
-      message.warning('该配置下暂无试题，请选择其他配置', {
-        description: '请尝试选择其他学期、年级、学科或分类'
-      })
+      // 检查是否是学期时间相关的错误
+      if (questionsStore.error && questionsStore.error.includes('学期')) {
+        message.warning(questionsStore.error, {
+          description: '请联系管理员或等待学期开启',
+          duration: 5000
+        })
+      } else {
+        message.warning('该配置下暂无试题，请选择其他配置', {
+          description: '请尝试选择其他学期、年级、学科或分类'
+        })
+      }
       return
     }
-
 
     // 显示成功消息
     message.success('准备就绪，开始练习！', {
@@ -391,10 +455,20 @@ const startPractice = async () => {
 
   } catch (error) {
     console.error('开始练习失败:', error)
-    message.error('开始练习失败', {
-      description: '请检查网络连接后重试',
-      duration: 4000
-    })
+
+    // 检查是否是学期时间相关的错误
+    if (error.response?.data?.detail?.type === 'semester_time_error') {
+      const errorDetail = error.response.data.detail
+      message.error(errorDetail.message, {
+        description: '请联系管理员或等待学期开启',
+        duration: 5000
+      })
+    } else {
+      message.error('开始练习失败', {
+        description: '请检查网络连接后重试',
+        duration: 4000
+      })
+    }
   } finally {
     loading.value = false
   }

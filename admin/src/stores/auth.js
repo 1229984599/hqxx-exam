@@ -45,8 +45,15 @@ export const useAuthStore = defineStore('auth', () => {
       // 获取用户权限
       await fetchPermissions()
 
-      // 启动token定时检查（传入token获取函数）
-      tokenManager.startPeriodicCheck(api, () => token.value)
+      // 启动token定时检查（传入token获取函数和更新函数）
+      tokenManager.startPeriodicCheck(
+        api,
+        () => token.value,
+        (newToken) => {
+          console.log('🔄 自动更新token到auth-store')
+          token.value = newToken
+        }
+      )
 
       return true
     } catch (error) {
@@ -106,11 +113,14 @@ export const useAuthStore = defineStore('auth', () => {
   }
   
   function logout() {
+    // 停止token定时检查
+    tokenManager.stopPeriodicCheck()
+
     token.value = null
     user.value = null
     permissions.value = []
     roles.value = []
-    tokenManager.stopPeriodicCheck()
+    console.log('🚪 用户已登出，token管理已清理')
   }
 
   // 刷新token
@@ -235,8 +245,15 @@ export const useAuthStore = defineStore('auth', () => {
       if (context.store.token) {
         if (tokenManager.isTokenValid(context.store.token)) {
           console.log('✅ Token有效，启动定时检查')
-          // 启动定时检查（传入token获取函数）
-          tokenManager.startPeriodicCheck(api, () => context.store.token)
+          // 启动定时检查（传入token获取函数和更新函数）
+          tokenManager.startPeriodicCheck(
+            api,
+            () => context.store.token,
+            (newToken) => {
+              console.log('🔄 自动更新token到auth-store (恢复时)')
+              context.store.token = newToken
+            }
+          )
           // 初始化用户信息
           await context.store.initialize()
         } else {

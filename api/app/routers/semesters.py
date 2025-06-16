@@ -22,7 +22,7 @@ async def get_semesters(
 ):
     """获取学期列表"""
     query = Semester.all()
-    
+
     if is_active is not None:
         query = query.filter(is_active=is_active)
 
@@ -30,7 +30,25 @@ async def get_semesters(
         query = query.filter(name__icontains=search) | query.filter(code__icontains=search)
 
     semesters = await query.offset(skip).limit(limit).order_by("sort_order", "id")
-    return semesters
+
+    # 手动转换日期字段
+    result = []
+    for semester in semesters:
+        semester_dict = {
+            "id": semester.id,
+            "name": semester.name,
+            "code": semester.code,
+            "start_date": semester.start_date.isoformat() if semester.start_date else None,
+            "end_date": semester.end_date.isoformat() if semester.end_date else None,
+            "is_active": semester.is_active,
+            "sort_order": semester.sort_order,
+            "description": semester.description,
+            "created_at": semester.created_at,
+            "updated_at": semester.updated_at
+        }
+        result.append(semester_dict)
+
+    return result
 
 
 @router.get("/{semester_id}", response_model=SemesterResponse, summary="获取学期详情")
@@ -39,7 +57,19 @@ async def get_semester(semester_id: int):
     semester = await Semester.filter(id=semester_id).first()
     if not semester:
         raise HTTPException(status_code=404, detail="Semester not found")
-    return semester
+
+    return {
+        "id": semester.id,
+        "name": semester.name,
+        "code": semester.code,
+        "start_date": semester.start_date.isoformat() if semester.start_date else None,
+        "end_date": semester.end_date.isoformat() if semester.end_date else None,
+        "is_active": semester.is_active,
+        "sort_order": semester.sort_order,
+        "description": semester.description,
+        "created_at": semester.created_at,
+        "updated_at": semester.updated_at
+    }
 
 
 @router.post("/", response_model=SemesterResponse, summary="创建学期")
@@ -57,7 +87,19 @@ async def create_semester(
         raise HTTPException(status_code=400, detail="Semester code already exists")
     
     semester = await Semester.create(**semester_data.dict())
-    return semester
+
+    return {
+        "id": semester.id,
+        "name": semester.name,
+        "code": semester.code,
+        "start_date": semester.start_date.isoformat() if semester.start_date else None,
+        "end_date": semester.end_date.isoformat() if semester.end_date else None,
+        "is_active": semester.is_active,
+        "sort_order": semester.sort_order,
+        "description": semester.description,
+        "created_at": semester.created_at,
+        "updated_at": semester.updated_at
+    }
 
 
 @router.put("/{semester_id}", response_model=SemesterResponse, summary="更新学期")
@@ -85,7 +127,19 @@ async def update_semester(
     for field, value in update_data.items():
         setattr(semester, field, value)
     await semester.save()
-    return semester
+
+    return {
+        "id": semester.id,
+        "name": semester.name,
+        "code": semester.code,
+        "start_date": semester.start_date.isoformat() if semester.start_date else None,
+        "end_date": semester.end_date.isoformat() if semester.end_date else None,
+        "is_active": semester.is_active,
+        "sort_order": semester.sort_order,
+        "description": semester.description,
+        "created_at": semester.created_at,
+        "updated_at": semester.updated_at
+    }
 
 
 @router.delete("/{semester_id}", response_model=MessageResponse, summary="删除学期")

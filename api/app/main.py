@@ -2,6 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from tortoise.contrib.fastapi import register_tortoise
 from app.config import settings, TORTOISE_ORM
+from app.core.cache import cache_manager
 from app.routers import auth, semesters, grades, subjects, categories, questions, templates, upload, analytics, system, search, roles, public
 from app.middleware.performance import PerformanceMiddleware
 
@@ -60,7 +61,12 @@ async def root():
 @app.get("/health")
 async def health_check():
     """健康检查"""
-    return {"status": "healthy"}
+    cache_health = cache_manager.health_check()
+    return {
+        "status": "healthy",
+        "cache": cache_health,
+        "version": "1.0.0"
+    }
 
 
 if __name__ == "__main__":

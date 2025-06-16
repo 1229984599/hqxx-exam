@@ -105,6 +105,7 @@
         <el-col :span="24">
           <el-form-item label="题目内容" prop="content">
             <TinyMCEEditor
+                api-key="gpl"
               v-model="form.content"
               :height="400"
               :toolbar-mode="'wrap'"
@@ -118,6 +119,7 @@
         <el-col :span="24">
           <el-form-item label="参考答案" prop="answer">
             <TinyMCEEditor
+                api-key="gpl"
               v-model="form.answer"
               :height="200"
               placeholder="请输入参考答案（可选）"

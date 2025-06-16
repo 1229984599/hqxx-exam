@@ -20,21 +20,35 @@ export const useConfigStore = defineStore('config', () => {
   
   // 计算属性
   const isConfigComplete = computed(() => {
-    return selectedSemester.value && 
-           selectedGrade.value && 
-           selectedSubject.value && 
+    return selectedSemester.value &&
+           selectedGrade.value &&
+           selectedSubject.value &&
            selectedCategory.value
   })
-  
+
+  const hasValidSemesters = computed(() => {
+    return semesters.value && semesters.value.length > 0
+  })
+
   const configSummary = computed(() => {
     if (!isConfigComplete.value) return ''
-    
+
     const semester = semesters.value.find(s => s.id === selectedSemester.value)
     const grade = grades.value.find(g => g.id === selectedGrade.value)
     const subject = subjects.value.find(s => s.id === selectedSubject.value)
     const category = categories.value.find(c => c.id === selectedCategory.value)
-    
+
     return `${semester?.name} - ${grade?.name} - ${subject?.name} - ${category?.name}`
+  })
+
+  const semesterStatusMessage = computed(() => {
+    if (!hasValidSemesters.value) {
+      return {
+        type: 'warning',
+        message: '暂无可用的学期，请联系管理员开启学期'
+      }
+    }
+    return null
   })
   
   // 方法
@@ -144,7 +158,9 @@ export const useConfigStore = defineStore('config', () => {
     
     // 计算属性
     isConfigComplete,
+    hasValidSemesters,
     configSummary,
+    semesterStatusMessage,
     
     // 方法
     loadSemesters,

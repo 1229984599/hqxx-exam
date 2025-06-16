@@ -106,58 +106,82 @@
     >
       <!-- 选择列 -->
       <el-table-column type="selection" width="55" />
-      <el-table-column prop="title" label="题目标题" min-width="300">
+      <el-table-column prop="title" label="题目标题" width="340">
         <template #default="{ row }">
           <div class="question-title">
             <span class="title-text">{{ row.title }}</span>
           </div>
         </template>
       </el-table-column>
-      <el-table-column prop="question_type" label="题目类型" width="120">
+      <el-table-column prop="difficulty" label="简要" min-width="300" align="center">
+        <template #default="{ row }">
+
+            {{getContentSummary(row.content)}}
+        </template>
+      </el-table-column>
+      <el-table-column align="center" prop="category.name" label="题目分类" width="120">
         <template #default="{ row }">
           <div class="question-title">
             <el-tag
-              :type="getQuestionTypeColor(row.question_type)"
               size="small"
               class="type-tag"
             >
-              {{ getQuestionTypeText(row.question_type) }}
+              {{ row.category?.name || '未分类' }}
             </el-tag>
           </div>
         </template>
       </el-table-column>
-      
-      <el-table-column prop="semester.name" label="学期" width="120" align="center">
+
+      <el-table-column align="center" prop="question_type" label="题目类型" width="120">
+        <template #default="{ row }">
+          <el-tag
+            size="small"
+            :type="getQuestionTypeColor(row.question_type)"
+          >
+            {{ getQuestionTypeText(row.question_type) }}
+          </el-tag>
+        </template>
+      </el-table-column>
+
+      <el-table-column prop="semester.name" label="学期" width="140" align="center">
         <template #default="{ row }">
           <el-tag v-if="row.semester" type="success" size="small">
             {{ row.semester.name }}
           </el-tag>
+          <span v-else class="text-gray-400">未设置</span>
         </template>
       </el-table-column>
-      
+
       <el-table-column prop="grade.name" label="年级" width="120" align="center">
         <template #default="{ row }">
           <el-tag v-if="row.grade" type="info" size="small">
             {{ row.grade.name }}
           </el-tag>
+          <span v-else class="text-gray-400">未设置</span>
         </template>
       </el-table-column>
-      
+
       <el-table-column prop="subject.name" label="学科" width="120" align="center">
         <template #default="{ row }">
           <el-tag v-if="row.subject" type="primary" size="small">
             {{ row.subject.name }}
           </el-tag>
+          <span v-else class="text-gray-400">未设置</span>
         </template>
       </el-table-column>
-      
+
       <el-table-column prop="difficulty" label="难度" width="100" align="center">
         <template #default="{ row }">
-          <el-tag :type="getDifficultyType(row.difficulty)" size="small">
+          <el-tag
+            :type="getDifficultyType(row.difficulty)"
+            size="small"
+          >
             {{ getDifficultyText(row.difficulty) }}
           </el-tag>
         </template>
       </el-table-column>
+      
+
       
       <el-table-column prop="is_published" align="center" label="状态" width="100">
         <template #default="{ row }">
@@ -263,8 +287,8 @@ async function loadQuestions() {
   loading.value = true
   try {
     const params = {
-      page: pagination.page,
-      size: pagination.size
+      skip: (pagination.page - 1) * pagination.size,
+      limit: pagination.size
     }
 
     // 添加筛选条件
@@ -275,13 +299,47 @@ async function loadQuestions() {
 
     const response = await api.get('/questions/', { params })
 
-    if (response.data.results) {
-      questions.value = response.data.results
-      pagination.total = response.data.total
+    // 处理响应数据结构
+    if (response.data && typeof response.data === 'object') {
+      if (Array.isArray(response.data)) {
+        // 如果直接返回数组
+        questions.value = response.data
+        pagination.total = response.data.length
+      } else if (response.data.items && Array.isArray(response.data.items)) {
+        // 如果返回 { items: [], total: number } 结构
+        questions.value = response.data.items
+        pagination.total = response.data.total || response.data.items.length
+      } else if (response.data.results && Array.isArray(response.data.results)) {
+        // 如果返回 { results: [], total: number } 结构
+        questions.value = response.data.results
+        pagination.total = response.data.total || response.data.results.length
+      } else {
+        // 其他情况，尝试直接使用data
+        questions.value = Array.isArray(response.data) ? response.data : []
+        pagination.total = questions.value.length
+      }
     } else {
-      questions.value = response.data
-      pagination.total = response.data.length
+      questions.value = []
+      pagination.total = 0
     }
+
+    // 数据验证和清理
+    questions.value = questions.value.map(question => ({
+      ...question,
+      // 确保基本字段存在
+      id: question.id || 0,
+      title: question.title || '无标题',
+      content: question.content || '',
+      difficulty: question.difficulty || 1,
+      question_type: question.question_type || 'single',
+      is_published: question.is_published || false,
+      view_count: question.view_count || 0,
+      // 确保关联对象存在
+      semester: question.semester || null,
+      grade: question.grade || null,
+      subject: question.subject || null,
+      category: question.category || null
+    }))
 
     // 如果没有数据，显示友好提示
     if (questions.value.length === 0 && pagination.page === 1) {
@@ -293,6 +351,9 @@ async function loadQuestions() {
     }
   } catch (error) {
     console.error('加载试题列表失败:', error)
+    questions.value = [] // 确保在错误时清空数据
+    pagination.total = 0
+
     const errorMessage = error.response?.data?.detail || error.message || '加载试题列表失败'
     ElMessage.error(errorMessage)
 
@@ -389,6 +450,30 @@ function getQuestionTypeColor(type) {
 function handleSelectionChange(selection) {
   selectedQuestions.value = selection
 }
+
+/**
+ * 获取内容简介
+ * @param text
+ * @param length
+ */
+function getContentSummary(text, length = 30) {
+  if (!text) return ''
+
+  // 去掉HTML标签，只保留文字内容
+  const cleanText = text.replace(/<[^>]+>/g, '')
+
+  // 提取中文字符
+  const chineseChars = cleanText.match(/[\u4e00-\u9fa5]/g)
+
+  if (!chineseChars || chineseChars.length === 0) {
+    // 如果没有中文字符，返回前length个字符
+    return cleanText.length > length ? cleanText.substring(0, length) + '...' : cleanText
+  }
+
+  // 如果有中文字符，返回前length个中文字符
+  const summary = chineseChars.slice(0, length).join('')
+  return summary + (chineseChars.length > length ? '...' : '')
+}
 </script>
 
 <style scoped>
@@ -412,12 +497,16 @@ function handleSelectionChange(selection) {
   display: flex;
   align-items: center;
   gap: 8px;
+
 }
 
 .title-text {
   flex: 1;
   font-weight: 500;
   color: #2d3748;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .type-tag {
@@ -473,5 +562,43 @@ function handleSelectionChange(selection) {
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   color: white;
   border-color: #667eea;
+}
+
+.text-gray-400 {
+  color: #9ca3af;
+  font-size: 12px;
+}
+
+/* 表格行悬停效果 */
+:deep(.el-table__row:hover) {
+  background-color: rgba(102, 126, 234, 0.05) !important;
+}
+
+/* 表格头部样式 */
+:deep(.el-table__header-wrapper) {
+  background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+}
+
+:deep(.el-table th) {
+  background: transparent !important;
+  font-weight: 600;
+  color: #374151;
+}
+
+/* 标签样式优化 */
+.type-tag {
+  font-weight: 500;
+  border-radius: 6px;
+}
+
+/* 操作按钮样式 */
+.action-buttons .el-button {
+  border-radius: 6px;
+  transition: all 0.2s ease;
+}
+
+.action-buttons .el-button:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
 }
 </style>

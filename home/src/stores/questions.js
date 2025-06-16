@@ -66,8 +66,10 @@ export const useQuestionsStore = defineStore('questions', () => {
         // 随机选择第一道题
         const randomIndex = Math.floor(Math.random() * questions.value.length)
         currentQuestion.value = questions.value[randomIndex]
-        viewedQuestionIds.value = [currentQuestion.value.id]
         currentQuestionIndex.value = randomIndex
+
+        // 初始加载时不添加到已查看列表，让用户有机会重新随机到这道题
+        viewedQuestionIds.value = []
 
         console.log(`成功加载 ${questions.value.length} 道试题，当前显示第 ${randomIndex + 1} 道`)
       } else {
@@ -78,7 +80,27 @@ export const useQuestionsStore = defineStore('questions', () => {
 
     } catch (err) {
       console.error('加载试题失败:', err)
-      error.value = '加载试题失败，请稍后重试'
+
+      // 检查是否是学期时间相关的错误
+      if (err.response?.data?.detail?.type === 'semester_time_error') {
+        const errorDetail = err.response.data.detail
+        switch (errorDetail.code) {
+          case 'SEMESTER_NOT_STARTED':
+            error.value = '学期尚未开始，请等待学期开始后再来练习'
+            break
+          case 'SEMESTER_ENDED':
+            error.value = '学期已结束，请联系管理员开启新学期'
+            break
+          case 'SEMESTER_INVALID_TIME':
+            error.value = '当前学期不在有效时间范围内'
+            break
+          default:
+            error.value = errorDetail.message || '学期时间无效'
+        }
+      } else {
+        error.value = '加载试题失败，请稍后重试'
+      }
+
       questions.value = []
       currentQuestion.value = null
     } finally {
@@ -102,14 +124,19 @@ export const useQuestionsStore = defineStore('questions', () => {
         return false
       }
 
-      // 获取未查看的试题
-      let availableQuestions = questions.value.filter(q => !viewedQuestionIds.value.includes(q.id))
+      // 获取除当前题目外的其他题目
+      let availableQuestions = questions.value.filter(q =>
+        currentQuestion.value ? q.id !== currentQuestion.value.id : true
+      )
 
-      // 如果所有题目都看过了，重置已查看列表（保留当前题目）
-      if (availableQuestions.length === 0) {
-        viewedQuestionIds.value = currentQuestion.value ? [currentQuestion.value.id] : []
-        availableQuestions = questions.value.filter(q => !viewedQuestionIds.value.includes(q.id))
+      // 在可用题目中，优先选择未查看的题目
+      let unviewedQuestions = availableQuestions.filter(q => !viewedQuestionIds.value.includes(q.id))
+
+      // 如果有未查看的题目，从中随机选择
+      if (unviewedQuestions.length > 0) {
+        availableQuestions = unviewedQuestions
       }
+      // 如果没有未查看的题目，说明除了当前题目外都看过了，从所有其他题目中随机选择
 
       if (availableQuestions.length === 0) {
         error.value = '没有更多题目了'
@@ -122,7 +149,11 @@ export const useQuestionsStore = defineStore('questions', () => {
 
       // 更新当前题目
       currentQuestion.value = selectedQuestion
-      viewedQuestionIds.value.push(selectedQuestion.id)
+
+      // 将新选择的题目添加到已查看列表（如果还没有的话）
+      if (!viewedQuestionIds.value.includes(selectedQuestion.id)) {
+        viewedQuestionIds.value.push(selectedQuestion.id)
+      }
 
       // 更新索引
       currentQuestionIndex.value = questions.value.findIndex(q => q.id === selectedQuestion.id)
