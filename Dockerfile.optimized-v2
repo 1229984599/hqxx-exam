@@ -1,0 +1,122 @@
+# 优化版本2：中等优化，移除内置服务
+# 预计镜像大小：200-250MB（减少约140MB）
+# 注意：需要外部Redis和反向代理
+
+# 多阶段构建 - 前端构建阶段
+FROM node:18-alpine AS frontend-builder
+
+WORKDIR /build
+
+# 复制前端项目文件
+COPY home/package*.json home/pnpm-lock.yaml* ./home/
+COPY admin/package*.json admin/pnpm-lock.yaml* ./admin/
+
+# 安装pnpm并设置镜像源
+RUN npm config set registry https://registry.npmmirror.com && \
+    npm install -g pnpm && \
+    pnpm config set registry https://registry.npmmirror.com
+
+# 构建前端项目（优化构建）
+WORKDIR /build/home
+COPY home/ .
+RUN pnpm install --frozen-lockfile && \
+    NODE_ENV=production pnpm build && \
+    # 压缩和优化静态文件
+    find dist -name "*.js" -exec gzip -9 -k {} \; && \
+    find dist -name "*.css" -exec gzip -9 -k {} \; && \
+    find dist -name "*.html" -exec gzip -9 -k {} \; && \
+    find dist -name "*.svg" -exec gzip -9 -k {} \; && \
+    # 删除源映射文件（生产环境不需要）
+    find dist -name "*.map" -delete
+
+# 构建管理后台
+WORKDIR /build/admin
+COPY admin/ .
+RUN pnpm install --frozen-lockfile && \
+    NODE_ENV=production pnpm build && \
+    # 压缩和优化静态文件
+    find dist -name "*.js" -exec gzip -9 -k {} \; && \
+    find dist -name "*.css" -exec gzip -9 -k {} \; && \
+    find dist -name "*.html" -exec gzip -9 -k {} \; && \
+    find dist -name "*.svg" -exec gzip -9 -k {} \; && \
+    # 删除源映射文件
+    find dist -name "*.map" -delete
+
+# Python依赖构建阶段
+FROM python:3.11-alpine AS python-builder
+
+# 安装构建依赖
+RUN apk add --no-cache --virtual .build-deps \
+    gcc \
+    musl-dev \
+    libffi-dev \
+    openssl-dev \
+    cargo \
+    rust \
+    && pip install --no-cache-dir pdm
+
+WORKDIR /build
+
+# 复制Python项目文件
+COPY api/pyproject.toml api/pdm.lock* ./
+
+# 安装Python依赖（生产环境优化）
+RUN pdm install --prod --no-editable --no-self && \
+    # 清理Python缓存和编译文件
+    find /build/.venv -name "*.pyc" -delete && \
+    find /build/.venv -name "__pycache__" -type d -exec rm -rf {} + 2>/dev/null || true && \
+    find /build/.venv -name "*.pyo" -delete && \
+    # 删除不必要的包文件
+    find /build/.venv -name "tests" -type d -exec rm -rf {} + 2>/dev/null || true && \
+    find /build/.venv -name "test" -type d -exec rm -rf {} + 2>/dev/null || true && \
+    # 清理构建依赖
+    apk del .build-deps && \
+    pip cache purge
+
+# 最终运行阶段 - 精简版本（不包含nginx、redis、supervisor）
+FROM python:3.11-alpine AS runtime
+
+# 只安装必要的运行时依赖
+RUN apk add --no-cache \
+    sqlite \
+    curl \
+    && rm -rf /var/cache/apk/* \
+    && rm -rf /tmp/*
+
+# 创建应用目录和用户
+WORKDIR /app
+RUN addgroup -g 1000 appuser && \
+    adduser -D -s /bin/sh -u 1000 -G appuser appuser && \
+    mkdir -p /app/api /app/static /app/data && \
+    chown -R appuser:appuser /app
+
+# 复制Python依赖
+COPY --from=python-builder /build/.venv /app/.venv
+
+# 复制前端构建文件
+COPY --from=frontend-builder /build/home/dist /app/static/home
+COPY --from=frontend-builder /build/admin/dist /app/static/admin
+
+# 复制后端代码（只复制必要的文件）
+COPY --chown=appuser:appuser api/app/ /app/api/app/
+COPY --chown=appuser:appuser api/pyproject.toml /app/api/
+
+# 设置环境变量
+ENV PATH="/app/.venv/bin:$PATH" \
+    PYTHONPATH="/app/api:$PYTHONPATH" \
+    PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONOPTIMIZE=1
+
+# 切换到非root用户
+USER appuser
+
+# 暴露端口
+EXPOSE 8000
+
+# 健康检查
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+    CMD curl -f http://localhost:8000/api/health || exit 1
+
+# 直接运行FastAPI应用
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]

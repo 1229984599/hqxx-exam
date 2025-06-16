@@ -1,0 +1,187 @@
+# 单容器架构极致优化版本
+# 保持nginx、redis、supervisor在容器内，但大幅减少镜像大小
+# 预计镜像大小：220-280MB（减少约110-170MB）
+
+# 多阶段构建 - 前端构建阶段
+FROM node:18-alpine AS frontend-builder
+
+WORKDIR /build
+
+# 复制前端项目文件
+COPY home/package*.json home/pnpm-lock.yaml* ./home/
+COPY admin/package*.json admin/pnpm-lock.yaml* ./admin/
+
+# 安装pnpm并设置镜像源
+RUN npm config set registry https://registry.npmmirror.com && \
+    npm install -g pnpm && \
+    pnpm config set registry https://registry.npmmirror.com
+
+# 构建前端项目（极致优化）
+WORKDIR /build/home
+COPY home/ .
+RUN pnpm install --frozen-lockfile && \
+    NODE_ENV=production pnpm build && \
+    # 极致压缩静态文件
+    find dist -name "*.js" -exec gzip -9 -k {} \; && \
+    find dist -name "*.css" -exec gzip -9 -k {} \; && \
+    find dist -name "*.html" -exec gzip -9 -k {} \; && \
+    find dist -name "*.svg" -exec gzip -9 -k {} \; && \
+    find dist -name "*.json" -exec gzip -9 -k {} \; && \
+    # 删除所有不必要的文件
+    find dist -name "*.map" -delete && \
+    find dist -name "*.txt" -delete && \
+    find dist -name "*.md" -delete && \
+    find dist -name "*.LICENSE" -delete
+
+# 构建管理后台
+WORKDIR /build/admin
+COPY admin/ .
+RUN pnpm install --frozen-lockfile && \
+    NODE_ENV=production pnpm build && \
+    # 极致压缩静态文件
+    find dist -name "*.js" -exec gzip -9 -k {} \; && \
+    find dist -name "*.css" -exec gzip -9 -k {} \; && \
+    find dist -name "*.html" -exec gzip -9 -k {} \; && \
+    find dist -name "*.svg" -exec gzip -9 -k {} \; && \
+    find dist -name "*.json" -exec gzip -9 -k {} \; && \
+    # 删除所有不必要的文件
+    find dist -name "*.map" -delete && \
+    find dist -name "*.txt" -delete && \
+    find dist -name "*.md" -delete && \
+    find dist -name "*.LICENSE" -delete
+
+# Python依赖构建阶段 - 使用slim基础镜像
+FROM python:3.11-slim AS python-builder
+
+# 安装构建依赖（最小化）
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+    gcc \
+    g++ \
+    libc6-dev \
+    libffi-dev \
+    libssl-dev \
+    cargo \
+    rustc \
+    && pip install --no-cache-dir pdm
+
+WORKDIR /build
+
+# 复制Python项目文件
+COPY api/pyproject.toml api/pdm.lock* ./
+
+# 安装Python依赖（极致优化）
+RUN pdm install --prod --no-editable --no-self && \
+    # 深度清理Python环境
+    find /build/.venv -name "*.pyc" -delete && \
+    find /build/.venv -name "__pycache__" -type d -exec rm -rf {} + 2>/dev/null || true && \
+    find /build/.venv -name "*.pyo" -delete && \
+    find /build/.venv -name "*.pyd" -delete && \
+    find /build/.venv -name "tests" -type d -exec rm -rf {} + 2>/dev/null || true && \
+    find /build/.venv -name "test" -type d -exec rm -rf {} + 2>/dev/null || true && \
+    find /build/.venv -name "docs" -type d -exec rm -rf {} + 2>/dev/null || true && \
+    find /build/.venv -name "examples" -type d -exec rm -rf {} + 2>/dev/null || true && \
+    find /build/.venv -name "*.dist-info" -type d -exec find {} -name "RECORD" -delete \; 2>/dev/null || true && \
+    find /build/.venv -name "*.egg-info" -type d -exec rm -rf {} + 2>/dev/null || true && \
+    # 删除大型不必要的包
+    rm -rf /build/.venv/lib/python*/site-packages/pip* && \
+    rm -rf /build/.venv/lib/python*/site-packages/setuptools* && \
+    rm -rf /build/.venv/lib/python*/site-packages/wheel* && \
+    # 清理构建依赖
+    apt-get purge -y gcc g++ libc6-dev libffi-dev libssl-dev cargo rustc && \
+    apt-get autoremove -y && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/* && \
+    pip cache purge
+
+# 最终运行阶段 - 使用slim基础镜像
+FROM python:3.11-slim AS runtime
+
+# 安装运行时依赖（精简版本，一次性安装并清理）
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+    nginx-light \
+    redis-server \
+    supervisor \
+    sqlite3 \
+    curl \
+    gzip \
+    && apt-get clean && \
+    rm -rf /var/lib/apt/lists/* && \
+    rm -rf /tmp/* && \
+    rm -rf /var/tmp/* && \
+    # 清理nginx不必要的文件
+    rm -rf /var/log/nginx/*.log && \
+    rm -rf /etc/nginx/sites-enabled/default && \
+    rm -rf /etc/nginx/sites-available/default && \
+    # 清理redis不必要的文件
+    rm -rf /var/lib/redis/* && \
+    rm -rf /var/log/redis/* && \
+    # 清理supervisor不必要的文件
+    rm -rf /etc/supervisor/conf.d/*
+
+# 创建应用目录和用户（一次性操作）
+WORKDIR /app
+RUN mkdir -p \
+    /app/api \
+    /app/static/home \
+    /app/static/admin \
+    /app/config \
+    /app/scripts \
+    /app/data \
+    /var/log/supervisor \
+    /run/nginx \
+    && addgroup --gid 1000 appuser \
+    && adduser --disabled-password --gecos '' --uid 1000 --gid 1000 appuser
+
+# 复制Python依赖
+COPY --from=python-builder /build/.venv /app/.venv
+
+# 复制前端构建文件
+COPY --from=frontend-builder /build/home/dist /app/static/home
+COPY --from=frontend-builder /build/admin/dist /app/static/admin
+
+# 复制后端代码（只复制必要的文件）
+COPY api/app/ /app/api/app/
+COPY api/pyproject.toml /app/api/
+
+# 设置环境变量
+ENV PATH="/app/.venv/bin:$PATH" \
+    PYTHONPATH="/app/api:$PYTHONPATH" \
+    PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONOPTIMIZE=1
+
+# 复制配置文件
+COPY docker/nginx.conf /app/config/
+COPY docker/supervisord.conf /app/config/
+COPY docker/redis.conf /app/config/
+COPY docker/start.sh /app/scripts/
+COPY docker/init_db.sh /app/scripts/
+
+# 设置权限并进行最终清理（合并操作）
+RUN chmod +x /app/scripts/start.sh /app/scripts/init_db.sh && \
+    chown -R nginx:nginx /var/lib/nginx /var/log/nginx && \
+    chown -R appuser:appuser /app && \
+    # 最终清理
+    find /app -name "*.pyc" -delete && \
+    find /app -name "__pycache__" -type d -exec rm -rf {} + 2>/dev/null || true && \
+    find /app -name "*.pyo" -delete && \
+    find /app -name ".pytest_cache" -type d -exec rm -rf {} + 2>/dev/null || true && \
+    # 清理系统临时文件
+    rm -rf /tmp/* /var/tmp/* /root/.cache && \
+    # 清理apt缓存（如果有残留）
+    rm -rf /var/cache/apt/* && \
+    # 清理Python缓存
+    find /usr/local -name "*.pyc" -delete 2>/dev/null || true && \
+    find /usr/local -name "__pycache__" -type d -exec rm -rf {} + 2>/dev/null || true
+
+# 暴露端口
+EXPOSE 80
+
+# 健康检查
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+    CMD curl -f http://localhost/api/health || exit 1
+
+# 设置启动命令
+CMD ["/app/scripts/start.sh"]

@@ -9,6 +9,16 @@ on:
         required: false
         default: false
         type: boolean
+      dockerfile_version:
+        description: 'Dockerfile版本'
+        required: false
+        default: 'original'
+        type: choice
+        options:
+          - original
+          - optimized-v1
+          - optimized-v2
+          - optimized-v3
       
   # 当api/pyproject.toml文件变化时触发
   push:
@@ -138,11 +148,44 @@ jobs:
             # 使用commit SHA作为标签
             type=sha,prefix={{branch}}-
 
+      - name: 确定Dockerfile路径
+        id: dockerfile
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            DOCKERFILE_VERSION="${{ github.event.inputs.dockerfile_version }}"
+          else
+            DOCKERFILE_VERSION="original"
+          fi
+
+          case $DOCKERFILE_VERSION in
+            "optimized-v1")
+              DOCKERFILE_PATH="./Dockerfile.optimized-v1"
+              IMAGE_SUFFIX="-optimized-v1"
+              ;;
+            "optimized-v2")
+              DOCKERFILE_PATH="./Dockerfile.optimized-v2"
+              IMAGE_SUFFIX="-optimized-v2"
+              ;;
+            "optimized-v3")
+              DOCKERFILE_PATH="./Dockerfile.optimized-v3"
+              IMAGE_SUFFIX="-optimized-v3"
+              ;;
+            *)
+              DOCKERFILE_PATH="./Dockerfile"
+              IMAGE_SUFFIX=""
+              ;;
+          esac
+
+          echo "dockerfile-path=$DOCKERFILE_PATH" >> $GITHUB_OUTPUT
+          echo "image-suffix=$IMAGE_SUFFIX" >> $GITHUB_OUTPUT
+          echo "version=$DOCKERFILE_VERSION" >> $GITHUB_OUTPUT
+          echo "使用Dockerfile: $DOCKERFILE_PATH"
+
       - name: 构建并推送Docker镜像
         uses: docker/build-push-action@v5
         with:
           context: .
-          file: ./Dockerfile
+          file: ${{ steps.dockerfile.outputs.dockerfile-path }}
           platforms: linux/amd64,linux/arm64
           push: ${{ github.event_name != 'pull_request' }}
           tags: ${{ steps.meta.outputs.tags }}
@@ -157,6 +200,7 @@ jobs:
           echo "## 🐳 Docker镜像构建完成" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "**版本号:** ${{ needs.check-version.outputs.version }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Dockerfile版本:** ${{ steps.dockerfile.outputs.version }}" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "**镜像标签:**" >> $GITHUB_STEP_SUMMARY
           echo '```' >> $GITHUB_STEP_SUMMARY
@@ -168,6 +212,13 @@ jobs:
             echo '```bash' >> $GITHUB_STEP_SUMMARY
             echo "docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ needs.check-version.outputs.version }}" >> $GITHUB_STEP_SUMMARY
             echo '```' >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "**部署说明:**" >> $GITHUB_STEP_SUMMARY
+            if [ "${{ steps.dockerfile.outputs.version }}" = "optimized-v2" ] || [ "${{ steps.dockerfile.outputs.version }}" = "optimized-v3" ]; then
+              echo "此版本需要外部Redis和Nginx服务，请使用 docker-compose.optimized.yml 部署" >> $GITHUB_STEP_SUMMARY
+            else
+              echo "此版本为单容器部署，可直接运行或使用原 docker-compose.yml" >> $GITHUB_STEP_SUMMARY
+            fi
           else
             echo "**注意:** 这是PR构建，镜像未推送到registry" >> $GITHUB_STEP_SUMMARY
           fi

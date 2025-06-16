@@ -27,30 +27,6 @@
         </span>
       </h1>
 
-      <!-- 副标题 -->
-      <div class="max-w-2xl mx-auto">
-        <p class="text-lg sm:text-xl text-gray-600 font-medium mb-4">智能学习，精准练习，助力成长</p>
-        <div class="flex flex-wrap justify-center gap-4 text-sm text-gray-500">
-          <span class="flex items-center gap-1">
-            <svg class="w-4 h-4 text-green-500" fill="currentColor" viewBox="0 0 20 20">
-              <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"></path>
-            </svg>
-            智能推荐
-          </span>
-          <span class="flex items-center gap-1">
-            <svg class="w-4 h-4 text-blue-500" fill="currentColor" viewBox="0 0 20 20">
-              <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"></path>
-            </svg>
-            个性化学习
-          </span>
-          <span class="flex items-center gap-1">
-            <svg class="w-4 h-4 text-purple-500" fill="currentColor" viewBox="0 0 20 20">
-              <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"></path>
-            </svg>
-            实时反馈
-          </span>
-        </div>
-      </div>
     </div>
 
     <!-- 配置卡片 -->
@@ -305,32 +281,6 @@
       </div>
     </div>
     
-    <!-- 功能介绍 -->
-    <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mt-12">
-      <div class="card bg-base-100 shadow-lg">
-        <div class="card-body text-center">
-          <div class="text-primary text-4xl mb-4">📚</div>
-          <h3 class="card-title justify-center">丰富题库</h3>
-          <p class="text-sm text-base-content/70">涵盖各个学期、年级、学科的精选试题</p>
-        </div>
-      </div>
-      
-      <div class="card bg-base-100 shadow-lg">
-        <div class="card-body text-center">
-          <div class="text-primary text-4xl mb-4">🎯</div>
-          <h3 class="card-title justify-center">智能练习</h3>
-          <p class="text-sm text-base-content/70">根据配置智能推荐，随机出题不重复</p>
-        </div>
-      </div>
-      
-      <div class="card bg-base-100 shadow-lg">
-        <div class="card-body text-center">
-          <div class="text-primary text-4xl mb-4">⚡</div>
-          <h3 class="card-title justify-center">即时反馈</h3>
-          <p class="text-sm text-base-content/70">实时查看答案，快速提升学习效果</p>
-        </div>
-      </div>
-    </div>
 
 </template>
 

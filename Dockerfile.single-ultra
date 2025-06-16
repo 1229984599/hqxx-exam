@@ -1,0 +1,190 @@
+# 单容器架构超级优化版本
+# 使用alpine基础镜像，极致精简所有组件
+# 预计镜像大小：180-230MB（减少约160-210MB）
+
+# 多阶段构建 - 前端构建阶段
+FROM node:18-alpine AS frontend-builder
+
+WORKDIR /build
+
+# 复制前端项目文件
+COPY home/package*.json home/pnpm-lock.yaml* ./home/
+COPY admin/package*.json admin/pnpm-lock.yaml* ./admin/
+
+# 安装pnpm
+RUN npm config set registry https://registry.npmmirror.com && \
+    npm install -g pnpm && \
+    pnpm config set registry https://registry.npmmirror.com
+
+# 构建前端项目（超级优化）
+WORKDIR /build/home
+COPY home/ .
+RUN pnpm install --frozen-lockfile && \
+    NODE_ENV=production pnpm build && \
+    # 超级压缩和清理
+    find dist -name "*.js" -exec sh -c 'gzip -9 -c "$1" > "$1.gz"' _ {} \; && \
+    find dist -name "*.css" -exec sh -c 'gzip -9 -c "$1" > "$1.gz"' _ {} \; && \
+    find dist -name "*.html" -exec sh -c 'gzip -9 -c "$1" > "$1.gz"' _ {} \; && \
+    find dist -name "*.svg" -exec sh -c 'gzip -9 -c "$1" > "$1.gz"' _ {} \; && \
+    find dist -name "*.json" -exec sh -c 'gzip -9 -c "$1" > "$1.gz"' _ {} \; && \
+    # 删除所有不必要的文件
+    find dist -name "*.map" -delete && \
+    find dist -name "*.txt" -delete && \
+    find dist -name "*.md" -delete && \
+    find dist -name "*.LICENSE*" -delete && \
+    find dist -name "*.log" -delete && \
+    find dist -name "*.tmp" -delete
+
+# 构建管理后台
+WORKDIR /build/admin
+COPY admin/ .
+RUN pnpm install --frozen-lockfile && \
+    NODE_ENV=production pnpm build && \
+    # 超级压缩和清理
+    find dist -name "*.js" -exec sh -c 'gzip -9 -c "$1" > "$1.gz"' _ {} \; && \
+    find dist -name "*.css" -exec sh -c 'gzip -9 -c "$1" > "$1.gz"' _ {} \; && \
+    find dist -name "*.html" -exec sh -c 'gzip -9 -c "$1" > "$1.gz"' _ {} \; && \
+    find dist -name "*.svg" -exec sh -c 'gzip -9 -c "$1" > "$1.gz"' _ {} \; && \
+    find dist -name "*.json" -exec sh -c 'gzip -9 -c "$1" > "$1.gz"' _ {} \; && \
+    # 删除所有不必要的文件
+    find dist -name "*.map" -delete && \
+    find dist -name "*.txt" -delete && \
+    find dist -name "*.md" -delete && \
+    find dist -name "*.LICENSE*" -delete && \
+    find dist -name "*.log" -delete && \
+    find dist -name "*.tmp" -delete
+
+# Python依赖构建阶段
+FROM python:3.11-alpine AS python-builder
+
+# 安装构建依赖
+RUN apk add --no-cache --virtual .build-deps \
+    gcc \
+    musl-dev \
+    libffi-dev \
+    openssl-dev \
+    cargo \
+    rust \
+    && pip install --no-cache-dir pdm
+
+WORKDIR /build
+
+# 复制Python项目文件
+COPY api/pyproject.toml api/pdm.lock* ./
+
+# 安装Python依赖（超级优化）
+RUN pdm install --prod --no-editable --no-self && \
+    # 超级清理Python环境
+    find /build/.venv -name "*.pyc" -delete && \
+    find /build/.venv -name "__pycache__" -type d -exec rm -rf {} + 2>/dev/null || true && \
+    find /build/.venv -name "*.pyo" -delete && \
+    find /build/.venv -name "*.pyd" -delete && \
+    find /build/.venv -name "tests" -type d -exec rm -rf {} + 2>/dev/null || true && \
+    find /build/.venv -name "test" -type d -exec rm -rf {} + 2>/dev/null || true && \
+    find /build/.venv -name "docs" -type d -exec rm -rf {} + 2>/dev/null || true && \
+    find /build/.venv -name "examples" -type d -exec rm -rf {} + 2>/dev/null || true && \
+    find /build/.venv -name "*.dist-info" -type d -exec rm -rf {} + 2>/dev/null || true && \
+    find /build/.venv -name "*.egg-info" -type d -exec rm -rf {} + 2>/dev/null || true && \
+    # 删除大型不必要的包和文件
+    rm -rf /build/.venv/lib/python*/site-packages/pip* && \
+    rm -rf /build/.venv/lib/python*/site-packages/setuptools* && \
+    rm -rf /build/.venv/lib/python*/site-packages/wheel* && \
+    rm -rf /build/.venv/lib/python*/site-packages/*/tests && \
+    rm -rf /build/.venv/lib/python*/site-packages/*/test && \
+    find /build/.venv -name "*.so" -exec strip {} \; 2>/dev/null || true && \
+    # 清理构建依赖
+    apk del .build-deps && \
+    pip cache purge
+
+# 最终运行阶段 - 超级精简
+FROM python:3.11-alpine AS runtime
+
+# 安装运行时依赖（超级精简版本）
+RUN apk add --no-cache \
+    nginx \
+    redis \
+    supervisor \
+    sqlite \
+    curl \
+    gzip \
+    && rm -rf /var/cache/apk/* && \
+    rm -rf /tmp/* && \
+    # 清理nginx
+    rm -rf /var/log/nginx/*.log && \
+    rm -rf /etc/nginx/http.d/default.conf && \
+    # 清理redis
+    rm -rf /var/lib/redis/* && \
+    rm -rf /var/log/redis/* && \
+    # 清理supervisor
+    rm -rf /etc/supervisor.d/*
+
+# 创建应用目录和用户
+WORKDIR /app
+RUN mkdir -p \
+    /app/api \
+    /app/static/home \
+    /app/static/admin \
+    /app/config \
+    /app/scripts \
+    /app/data \
+    /var/log/supervisor \
+    /run/nginx \
+    && addgroup -g 1000 appuser \
+    && adduser -D -s /bin/sh -u 1000 -G appuser appuser
+
+# 复制Python依赖
+COPY --from=python-builder /build/.venv /app/.venv
+
+# 复制前端构建文件
+COPY --from=frontend-builder /build/home/dist /app/static/home
+COPY --from=frontend-builder /build/admin/dist /app/static/admin
+
+# 复制后端代码（只复制必要的文件）
+COPY api/app/ /app/api/app/
+COPY api/pyproject.toml /app/api/
+
+# 设置环境变量
+ENV PATH="/app/.venv/bin:$PATH" \
+    PYTHONPATH="/app/api:$PYTHONPATH" \
+    PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONOPTIMIZE=2
+
+# 复制配置文件
+COPY docker/nginx.conf /app/config/
+COPY docker/supervisord.conf /app/config/
+COPY docker/redis.conf /app/config/
+COPY docker/start.sh /app/scripts/
+COPY docker/init_db.sh /app/scripts/
+
+# 设置权限并进行超级清理
+RUN chmod +x /app/scripts/start.sh /app/scripts/init_db.sh && \
+    chown -R nginx:nginx /var/lib/nginx /var/log/nginx && \
+    chown -R appuser:appuser /app && \
+    # 超级清理
+    find /app -name "*.pyc" -delete && \
+    find /app -name "__pycache__" -type d -exec rm -rf {} + 2>/dev/null || true && \
+    find /app -name "*.pyo" -delete && \
+    find /app -name ".pytest_cache" -type d -exec rm -rf {} + 2>/dev/null || true && \
+    # 清理系统文件
+    rm -rf /tmp/* /var/tmp/* /root/.cache && \
+    # 清理Python系统缓存
+    find /usr/local -name "*.pyc" -delete 2>/dev/null || true && \
+    find /usr/local -name "__pycache__" -type d -exec rm -rf {} + 2>/dev/null || true && \
+    # 清理不必要的系统文件
+    rm -rf /usr/share/man/* && \
+    rm -rf /usr/share/doc/* && \
+    rm -rf /usr/share/info/* && \
+    rm -rf /var/cache/* && \
+    # 压缩可执行文件（如果strip可用）
+    find /app/.venv -name "*.so" -exec strip {} \; 2>/dev/null || true
+
+# 暴露端口
+EXPOSE 80
+
+# 健康检查
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+    CMD curl -f http://localhost/api/health || exit 1
+
+# 设置启动命令
+CMD ["/app/scripts/start.sh"]
