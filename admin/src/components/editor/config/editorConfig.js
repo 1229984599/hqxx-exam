@@ -35,7 +35,7 @@ export const getPluginsConfig = () => [
 
 // 工具栏配置
 export const getToolbarConfig = (props) => ({
-  toolbar: 'responsivepreview | undo redo | blocks fontsize fontsizeplus fontsizeminus lineheight | bold italic underline strikethrough | alignleft aligncenter alignright alignjustify | outdent indent | numlist bullist | forecolor backcolor | link image styleimages table | quicksymbols | addpinyin removepinyin smartpinyin | inserttemplate | code | fullscreen',
+  toolbar: 'responsivepreview | undo redo | blocks fontsize fontsizeplus fontsizeminus lineheight | bold italic underline strikethrough | alignleft aligncenter alignright alignjustify | outdent indent | numlist bullist | forecolor backcolor | link image styleimages table | quicksymbols | addpinyin removepinyin smartpinyin | inserttemplate | advancedcode | fullscreen',
   toolbar_mode: props.toolbarMode,
   contextmenu: 'undo redo | cut copy paste pastetext | selectall | removeformat | addpinyin removepinyin | link unlink',
 })

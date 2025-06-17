@@ -81,6 +81,13 @@
       @clear-format="floatingClearFormat"
     />
 
+    <!-- 代码编辑器对话框 -->
+    <CodeEditorDialog
+      v-model="showCodeEditorDialog"
+      :content="content"
+      @apply="handleCodeApply"
+    />
+
 
   </div>
 </template>
@@ -128,6 +135,7 @@ import SymbolDialog from './dialogs/SymbolDialog.vue'
 import TemplateDialog from './dialogs/TemplateDialog.vue'
 import PinyinEditDialog from './dialogs/PinyinEditDialog.vue'
 import FloatingToolbar from './components/FloatingToolbar.vue'
+import CodeEditorDialog from './dialogs/CodeEditorDialog.vue'
 
 const props = defineProps({
   modelValue: {
@@ -193,9 +201,11 @@ const {
   showFloatingToolbar,
   floatingToolbarSelection,
   currentFormats,
+  showCodeEditorDialog,
   openSymbolDialog,
   openTemplateDialog,
   openResponsivePreview,
+  handleCodeApply,
   handlePinyinConfirm,
   handlePinyinRemove,
   floatingToggleFormat,

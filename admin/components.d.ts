@@ -11,6 +11,7 @@ declare module 'vue' {
     AnalyticsChart: typeof import('./src/components/AnalyticsChart.vue')['default']
     BatchOperations: typeof import('./src/components/BatchOperations.vue')['default']
     BatchOperationsGeneric: typeof import('./src/components/BatchOperationsGeneric.vue')['default']
+    CodeEditorDialog: typeof import('./src/components/editor/dialogs/CodeEditorDialog.vue')['default']
     ContentPreview: typeof import('./src/components/ContentPreview.vue')['default']
     CrudTable: typeof import('./src/components/CrudTable.vue')['default']
     ElAlert: typeof import('element-plus/es')['ElAlert']

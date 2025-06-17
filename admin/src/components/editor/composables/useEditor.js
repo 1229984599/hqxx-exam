@@ -79,6 +79,30 @@ export function useEditor(props, emit) {
     }
   }, { immediate: true })
 
+  // 对话框状态变量（需要在函数使用前定义）
+  const showSymbolDialog = ref(false)
+  const showTemplateDialog = ref(false)
+  const showPreviewDialog = ref(false)
+  const showPinyinEditDialog = ref(false)
+  const showCodeEditorDialog = ref(false)
+
+  // 浮动工具栏
+  const showFloatingToolbar = ref(false)
+  const floatingToolbarSelection = ref({})
+  const currentFormats = ref({})
+
+  // 拼音编辑数据
+  const pinyinEditData = ref({
+    character: '',
+    currentPinyin: '',
+    pinyinOptions: []
+  })
+
+  let pinyinEditCallbacks = {
+    onSelect: null,
+    onRemove: null
+  }
+
   // 浮动工具栏处理
   function handleFloatingToolbar(editor) {
     const selection = editor.selection
@@ -284,6 +308,31 @@ export function useEditor(props, emit) {
     })
   }
 
+  // 对话框控制函数（需要在按钮注册之前定义）
+  function openSymbolDialog() {
+    showSymbolDialog.value = true
+  }
+
+  function openTemplateDialog() {
+    showTemplateDialog.value = true
+  }
+
+  function openResponsivePreview() {
+    showPreviewDialog.value = true
+  }
+
+  function openCodeEditor() {
+    showCodeEditorDialog.value = true
+  }
+
+  function handleCodeApply(newCode) {
+    if (editorInstance.value) {
+      editorInstance.value.setContent(newCode)
+      content.value = newCode
+      emit('update:modelValue', newCode)
+    }
+  }
+
   // 设置编辑器按钮
   function setupEditorButtons(editor) {
     // 添加拼音注音按钮
@@ -372,6 +421,13 @@ export function useEditor(props, emit) {
       text: '👁️ 预览',
       tooltip: '响应式预览 - 查看内容在不同设备上的显示效果',
       onAction: () => openResponsivePreview()
+    })
+
+    // 添加高级代码编辑器按钮（替换默认的code按钮）
+    editor.ui.registry.addButton('advancedcode', {
+      text: '💻 源码',
+      tooltip: '高级源代码编辑器 - 支持语法高亮、格式化和验证',
+      onAction: () => openCodeEditor()
     })
   }
 
@@ -591,40 +647,9 @@ export function useEditor(props, emit) {
     }
   }
 
-  // 对话框控制函数
-  const showSymbolDialog = ref(false)
-  const showTemplateDialog = ref(false)
-  const showPreviewDialog = ref(false)
-  const showPinyinEditDialog = ref(false)
 
-  // 浮动工具栏
-  const showFloatingToolbar = ref(false)
-  const floatingToolbarSelection = ref({})
-  const currentFormats = ref({})
 
-  // 拼音编辑数据
-  const pinyinEditData = ref({
-    character: '',
-    currentPinyin: '',
-    pinyinOptions: []
-  })
 
-  let pinyinEditCallbacks = {
-    onSelect: null,
-    onRemove: null
-  }
-
-  function openSymbolDialog() {
-    showSymbolDialog.value = true
-  }
-
-  function openTemplateDialog() {
-    showTemplateDialog.value = true
-  }
-
-  function openResponsivePreview() {
-    showPreviewDialog.value = true
-  }
 
   // 拼音编辑相关函数
   function openPinyinEditDialog(character, currentPinyin, pinyinOptions, onSelect, onRemove) {
@@ -789,6 +814,7 @@ export function useEditor(props, emit) {
     showFloatingToolbar,
     floatingToolbarSelection,
     currentFormats,
+    showCodeEditorDialog,
 
     // 计算属性
     hasSelection,
@@ -807,6 +833,8 @@ export function useEditor(props, emit) {
     openSymbolDialog,
     openTemplateDialog,
     openResponsivePreview,
+    openCodeEditor,
+    handleCodeApply,
     openPinyinEditDialog,
     handlePinyinConfirm,
     handlePinyinRemove,

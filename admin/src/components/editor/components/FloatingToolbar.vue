@@ -245,13 +245,10 @@ function calculatePosition() {
   const range = props.selection.range
   const iframe = props.selection.iframe
 
-  console.log('=== 位置计算调试 ===')
-
   // 获取选中区域在iframe内的位置
   let rect
   try {
     rect = range.getBoundingClientRect()
-    console.log('1. Range位置 (相对于iframe):', rect)
   } catch (error) {
     console.error('获取选中区域位置失败:', error)
     return
@@ -261,7 +258,6 @@ function calculatePosition() {
   let iframeRect = { top: 0, left: 0 }
   if (iframe) {
     iframeRect = iframe.getBoundingClientRect()
-    console.log('2. Iframe位置 (相对于页面):', iframeRect)
   }
 
   // 计算选中区域在页面中的绝对位置
@@ -274,13 +270,7 @@ function calculatePosition() {
     height: rect.height
   }
 
-  console.log('3. 绝对位置:', absoluteRect)
-
   const toolbarRect = toolbarRef.value.getBoundingClientRect()
-  console.log('4. 工具栏尺寸:', {
-    width: toolbarRect.width,
-    height: toolbarRect.height
-  })
 
   // 计算工具栏位置
   let top = absoluteRect.top - toolbarRect.height - 10
@@ -299,16 +289,12 @@ function calculatePosition() {
     top = absoluteRect.bottom + 10
   }
 
-  console.log('5. 最终位置:', { top, left })
-
   toolbarStyle.value = {
     position: 'fixed',
     top: `${Math.round(top)}px`,
     left: `${Math.round(left)}px`,
     zIndex: 10000
   }
-
-  console.log('6. 应用样式:', toolbarStyle.value)
 }
 
 // 格式化操作
