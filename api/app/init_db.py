@@ -182,108 +182,44 @@ async def init_db():
 
         templates_data = [
             {
-                "name": "拼音练习",
-                "description": "带声调的拼音练习模板",
+                "name": "田字格练习",
+                "description": "标准田字格练习模板，支持智能文字替换",
                 "content": """
-                <div style="text-align: center; margin: 20px 0; padding: 20px; border: 2px dashed #409eff; border-radius: 10px;">
-                  <h3 style="color: #409eff; margin-bottom: 20px;">📖 拼音练习</h3>
-                  <p style="margin-bottom: 15px; color: #606266;">请读出下面的拼音：</p>
-                  <div style="font-size: 36px; letter-spacing: 8px; margin: 30px 0; line-height: 1.8;">
-                    bā  bí  bǔ  bò
+                <div style="text-align: center; margin: 20px 0; padding: 20px; border: 2px dashed #67c23a; border-radius: 10px;">
+                  <h3 style="color: #67c23a; margin-bottom: 20px;">📝 田字格练习</h3>
+                  <p style="margin-bottom: 15px; color: #606266;">请在田字格中练习书写：</p>
+                  <div style="display: flex; justify-content: center; flex-wrap: wrap; gap: 8px; margin: 30px 0;">
+                    <div class="tianzige-char" style="display: inline-block; width: 80px; height: 80px; border: 2px solid #333; position: relative; margin: 4px; text-align: center; line-height: 80px; font-size: 32px; background: #fafafa;">
+                      <div style="position: absolute; top: 50%; left: 0; right: 0; height: 1px; background: #ccc; z-index: 1;"></div>
+                      <div style="position: absolute; left: 50%; top: 0; bottom: 0; width: 1px; background: #ccc; z-index: 1;"></div>
+                      <span style="position: relative; z-index: 2; color: #333;">春</span>
+                    </div>
+                    <div class="tianzige-char" style="display: inline-block; width: 80px; height: 80px; border: 2px solid #333; position: relative; margin: 4px; text-align: center; line-height: 80px; font-size: 32px; background: #fafafa;">
+                      <div style="position: absolute; top: 50%; left: 0; right: 0; height: 1px; background: #ccc; z-index: 1;"></div>
+                      <div style="position: absolute; left: 50%; top: 0; bottom: 0; width: 1px; background: #ccc; z-index: 1;"></div>
+                      <span style="position: relative; z-index: 2; color: #333;">夏</span>
+                    </div>
+                    <div class="tianzige-char" style="display: inline-block; width: 80px; height: 80px; border: 2px solid #333; position: relative; margin: 4px; text-align: center; line-height: 80px; font-size: 32px; background: #fafafa;">
+                      <div style="position: absolute; top: 50%; left: 0; right: 0; height: 1px; background: #ccc; z-index: 1;"></div>
+                      <div style="position: absolute; left: 50%; top: 0; bottom: 0; width: 1px; background: #ccc; z-index: 1;"></div>
+                      <span style="position: relative; z-index: 2; color: #333;">秋</span>
+                    </div>
+                    <div class="tianzige-char" style="display: inline-block; width: 80px; height: 80px; border: 2px solid #333; position: relative; margin: 4px; text-align: center; line-height: 80px; font-size: 32px; background: #fafafa;">
+                      <div style="position: absolute; top: 50%; left: 0; right: 0; height: 1px; background: #ccc; z-index: 1;"></div>
+                      <div style="position: absolute; left: 50%; top: 0; bottom: 0; width: 1px; background: #ccc; z-index: 1;"></div>
+                      <span style="position: relative; z-index: 2; color: #333;">冬</span>
+                    </div>
                   </div>
                   <div style="margin-top: 20px; font-size: 14px; color: #909399;">
-                    提示：注意声调的准确性
+                    💡 提示：点击模板时可以输入要练习的文字，系统会自动替换
                   </div>
                 </div>
                 """,
-                "category": "语文",
-                "icon": "🔤",
-                "subject": chinese,
-                "is_system": True,
-                "sort_order": 1
-            },
-            {
-                "name": "汉字练习",
-                "description": "大字号汉字显示模板",
-                "content": """
-                <div style="text-align: center; margin: 20px 0; padding: 20px; border: 2px dashed #f56c6c; border-radius: 10px;">
-                  <h3 style="color: #f56c6c; margin-bottom: 20px;">✍️ 汉字练习</h3>
-                  <p style="margin-bottom: 15px; color: #606266;">请读出下面的汉字：</p>
-                  <div style="font-size: 48px; letter-spacing: 20px; margin: 30px 0; line-height: 1.5;">
-                    大  小  多  少
-                  </div>
-                  <div style="margin-top: 20px; font-size: 14px; color: #909399;">
-                    提示：注意笔画顺序
-                  </div>
-                </div>
-                """,
-                "category": "语文",
+                "category": "田字格",
                 "icon": "📝",
                 "subject": chinese,
                 "is_system": True,
-                "sort_order": 2
-            },
-            {
-                "name": "数学计算",
-                "description": "带答题区域的计算题",
-                "content": """
-                <div style="text-align: center; margin: 20px 0; padding: 20px; border: 2px dashed #e6a23c; border-radius: 10px;">
-                  <h3 style="color: #e6a23c; margin-bottom: 20px;">🔢 数学计算</h3>
-                  <p style="margin-bottom: 15px; color: #606266;">计算下面的题目：</p>
-                  <div style="font-size: 32px; margin: 30px 0; line-height: 2;">
-                    5 + 3 = <span style="border-bottom: 2px solid #333; padding: 0 20px; margin: 0 10px;"></span>
-                  </div>
-                  <div style="margin-top: 20px; font-size: 14px; color: #909399;">
-                    请在横线上写出答案
-                  </div>
-                </div>
-                """,
-                "category": "数学",
-                "icon": "🔢",
-                "subject": math,
-                "is_system": True,
-                "sort_order": 3
-            },
-            {
-                "name": "选择题",
-                "description": "标准ABCD选择题格式",
-                "content": """
-                <div style="margin: 20px 0; padding: 20px; border: 2px dashed #909399; border-radius: 10px;">
-                  <h3 style="color: #909399; margin-bottom: 15px;">☑️ 选择题</h3>
-                  <p style="margin-bottom: 15px; font-weight: bold;">题目：请选择正确答案</p>
-                  <div style="margin-left: 20px; line-height: 2;">
-                    <p>A. 选项一</p>
-                    <p>B. 选项二</p>
-                    <p>C. 选项三</p>
-                    <p>D. 选项四</p>
-                  </div>
-                  <div style="margin-top: 15px; font-size: 14px; color: #909399;">
-                    答案：<span style="border-bottom: 1px solid #333; padding: 0 10px;"></span>
-                  </div>
-                </div>
-                """,
-                "category": "通用",
-                "icon": "☑️",
-                "is_system": True,
-                "sort_order": 4
-            },
-            {
-                "name": "填空题",
-                "description": "带下划线的填空格式",
-                "content": """
-                <div style="margin: 20px 0; padding: 20px; border: 2px dashed #67c23a; border-radius: 10px;">
-                  <h3 style="color: #67c23a; margin-bottom: 15px;">✏️ 填空题</h3>
-                  <p style="line-height: 2.5;">
-                    请在横线上填入合适的词语：<br><br>
-                    春天来了，<span style="border-bottom: 2px solid #333; padding: 0 30px; margin: 0 5px;"></span>开花了，
-                    <span style="border-bottom: 2px solid #333; padding: 0 30px; margin: 0 5px;"></span>变绿了。
-                  </p>
-                </div>
-                """,
-                "category": "通用",
-                "icon": "✏️",
-                "is_system": True,
-                "sort_order": 5
+                "sort_order": 1
             }
         ]
 
