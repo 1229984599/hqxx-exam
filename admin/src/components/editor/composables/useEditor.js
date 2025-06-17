@@ -79,6 +79,61 @@ export function useEditor(props, emit) {
     }
   }, { immediate: true })
 
+  // 浮动工具栏处理
+  function handleFloatingToolbar(editor) {
+    const selection = editor.selection
+    const selectedContent = selection.getContent({ format: 'text' })
+
+    console.log('浮动工具栏处理:', {
+      selectedContent,
+      hasContent: selectedContent && selectedContent.trim().length > 0,
+      currentShowState: showFloatingToolbar.value
+    })
+
+    if (selectedContent && selectedContent.trim().length > 0) {
+      // 有选中内容，显示浮动工具栏
+      const range = selection.getRng()
+
+      // 获取编辑器iframe的位置信息
+      const editorIframe = editor.getContainer().querySelector('iframe')
+      const editorBody = editor.getBody()
+
+      console.log('编辑器信息:', {
+        iframe: editorIframe ? editorIframe.getBoundingClientRect() : null,
+        body: editorBody ? editorBody.getBoundingClientRect() : null,
+        range: range
+      })
+
+      floatingToolbarSelection.value = {
+        range: range,
+        content: selectedContent,
+        editor: editor,
+        iframe: editorIframe
+      }
+
+      console.log('设置浮动工具栏显示:', floatingToolbarSelection.value)
+
+      // 延迟获取格式状态，确保选择已稳定
+      setTimeout(() => {
+        if (editor && editor.selection) {
+          currentFormats.value = {
+            bold: editor.queryCommandState('Bold'),
+            italic: editor.queryCommandState('Italic'),
+            underline: editor.queryCommandState('Underline')
+          }
+          console.log('当前格式状态:', currentFormats.value)
+        }
+      }, 10)
+
+      showFloatingToolbar.value = true
+      console.log('浮动工具栏已设置为显示')
+    } else {
+      // 没有选中内容，隐藏浮动工具栏
+      showFloatingToolbar.value = false
+      console.log('浮动工具栏已隐藏')
+    }
+  }
+
   // 设置编辑器事件
   function setupEditorEvents(editor) {
     editor.on('init', () => {
@@ -88,6 +143,14 @@ export function useEditor(props, emit) {
     editor.on('SelectionChange', () => {
       const selection = editor.selection.getContent({ format: 'text' })
       selectedText.value = selection.trim()
+
+      console.log('SelectionChange 事件触发:', {
+        selectedText: selectedText.value,
+        hasSelection: selectedText.value.length > 0
+      })
+
+      // 处理浮动工具栏显示
+      handleFloatingToolbar(editor)
     })
 
     editor.on('Change', () => {
@@ -194,6 +257,17 @@ export function useEditor(props, emit) {
       if (rubyElement) {
         showPinyinContextMenu(rubyElement, e, editor)
       }
+    })
+
+    // 点击事件处理 - 点击编辑器外部隐藏浮动工具栏
+    editor.on('click', (e) => {
+      // 延迟检查，确保选择状态已更新
+      setTimeout(() => {
+        const selectedContent = editor.selection.getContent({ format: 'text' })
+        if (!selectedContent || selectedContent.trim().length === 0) {
+          showFloatingToolbar.value = false
+        }
+      }, 10)
     })
 
     // 图片样式应用
@@ -523,6 +597,11 @@ export function useEditor(props, emit) {
   const showPreviewDialog = ref(false)
   const showPinyinEditDialog = ref(false)
 
+  // 浮动工具栏
+  const showFloatingToolbar = ref(false)
+  const floatingToolbarSelection = ref({})
+  const currentFormats = ref({})
+
   // 拼音编辑数据
   const pinyinEditData = ref({
     character: '',
@@ -581,6 +660,91 @@ export function useEditor(props, emit) {
     showPinyinEditDialog.value = false
   }
 
+  // 浮动工具栏操作函数
+  function floatingToggleFormat(format) {
+    if (!editorInstance.value) return
+
+    // 保存当前选择
+    const selection = editorInstance.value.selection
+    const range = selection.getRng()
+
+    // 执行格式命令
+    editorInstance.value.execCommand(format)
+
+    // 恢复选择
+    setTimeout(() => {
+      try {
+        selection.setRng(range)
+        // 更新格式状态
+        currentFormats.value[format.toLowerCase()] = editorInstance.value.queryCommandState(format)
+      } catch (error) {
+        console.warn('恢复选择失败:', error)
+      }
+    }, 10)
+  }
+
+  function floatingAdjustFontSize(delta) {
+    if (!editorInstance.value) return
+    adjustFontSize(editorInstance.value, delta)
+  }
+
+  function floatingApplyTextColor(color) {
+    if (!editorInstance.value) return
+
+    // 保存当前选择
+    const selection = editorInstance.value.selection
+    const range = selection.getRng()
+
+    // 应用文字颜色
+    editorInstance.value.execCommand('ForeColor', false, color)
+
+    // 恢复选择
+    setTimeout(() => {
+      try {
+        selection.setRng(range)
+      } catch (error) {
+        console.warn('恢复选择失败:', error)
+      }
+    }, 10)
+  }
+
+  function floatingApplyBgColor(color) {
+    if (!editorInstance.value) return
+
+    // 保存当前选择
+    const selection = editorInstance.value.selection
+    const range = selection.getRng()
+
+    // 应用背景颜色
+    editorInstance.value.execCommand('BackColor', false, color)
+
+    // 恢复选择
+    setTimeout(() => {
+      try {
+        selection.setRng(range)
+      } catch (error) {
+        console.warn('恢复选择失败:', error)
+      }
+    }, 10)
+  }
+
+  function floatingAddPinyin() {
+    if (!editorInstance.value) return
+    addPinyinAnnotation()
+    showFloatingToolbar.value = false
+  }
+
+  function floatingToggleFormatBrush() {
+    // 这里会调用现有的格式刷功能
+    // TODO: 实现格式刷功能
+  }
+
+  function floatingClearFormat() {
+    if (!editorInstance.value) return
+    editorInstance.value.execCommand('RemoveFormat')
+    showFloatingToolbar.value = false
+  }
+
   // 处理输入和变化
   function handleInput(event) {
     content.value = event.target.getContent()
@@ -596,8 +760,18 @@ export function useEditor(props, emit) {
     if (event.target) {
       const selection = event.target.selection.getContent({ format: 'text' })
       selectedText.value = selection.trim()
+
+      console.log('选择变化:', {
+        selectedText: selectedText.value,
+        hasSelection: selectedText.value.length > 0
+      })
+
+      // 处理浮动工具栏显示
+      handleFloatingToolbar(event.target)
     }
   }
+
+
 
   return {
     // 响应式数据
@@ -612,6 +786,9 @@ export function useEditor(props, emit) {
     showPreviewDialog,
     showPinyinEditDialog,
     pinyinEditData,
+    showFloatingToolbar,
+    floatingToolbarSelection,
+    currentFormats,
 
     // 计算属性
     hasSelection,
@@ -633,6 +810,13 @@ export function useEditor(props, emit) {
     openPinyinEditDialog,
     handlePinyinConfirm,
     handlePinyinRemove,
+    floatingToggleFormat,
+    floatingAdjustFontSize,
+    floatingApplyTextColor,
+    floatingApplyBgColor,
+    floatingAddPinyin,
+    floatingToggleFormatBrush,
+    floatingClearFormat,
     handleInput,
     handleChange,
     handleSelectionChange

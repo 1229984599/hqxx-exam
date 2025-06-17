@@ -59,6 +59,7 @@ declare module 'vue' {
     ElText: typeof import('element-plus/es')['ElText']
     ElTree: typeof import('element-plus/es')['ElTree']
     ElUpload: typeof import('element-plus/es')['ElUpload']
+    FloatingToolbar: typeof import('./src/components/editor/components/FloatingToolbar.vue')['default']
     GlobalSearch: typeof import('./src/components/GlobalSearch.vue')['default']
     InfiniteScroll: typeof import('./src/components/InfiniteScroll.vue')['default']
     LazyImage: typeof import('./src/components/LazyImage.vue')['default']

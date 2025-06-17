@@ -65,6 +65,23 @@
       @confirm="handlePinyinConfirm"
       @remove="handlePinyinRemove"
     />
+
+    <!-- 浮动工具栏 -->
+    <FloatingToolbar
+      :visible="showFloatingToolbar"
+      :selection="floatingToolbarSelection"
+      :formats="currentFormats"
+      :format-brush-active="formatBrushActive"
+      @toggle-format="floatingToggleFormat"
+      @adjust-font-size="floatingAdjustFontSize"
+      @apply-text-color="floatingApplyTextColor"
+      @apply-bg-color="floatingApplyBgColor"
+      @add-pinyin="floatingAddPinyin"
+      @toggle-format-brush="floatingToggleFormatBrush"
+      @clear-format="floatingClearFormat"
+    />
+
+
   </div>
 </template>
 
@@ -110,6 +127,7 @@ import PreviewDialog from './dialogs/PreviewDialog.vue'
 import SymbolDialog from './dialogs/SymbolDialog.vue'
 import TemplateDialog from './dialogs/TemplateDialog.vue'
 import PinyinEditDialog from './dialogs/PinyinEditDialog.vue'
+import FloatingToolbar from './components/FloatingToolbar.vue'
 
 const props = defineProps({
   modelValue: {
@@ -162,6 +180,7 @@ const {
   content,
   selectedText,
   contentStats,
+  formatBrushActive,
   hasSelection,
   wordCount,
   editorConfig,
@@ -171,11 +190,21 @@ const {
   showPreviewDialog,
   showPinyinEditDialog,
   pinyinEditData,
+  showFloatingToolbar,
+  floatingToolbarSelection,
+  currentFormats,
   openSymbolDialog,
   openTemplateDialog,
   openResponsivePreview,
   handlePinyinConfirm,
   handlePinyinRemove,
+  floatingToggleFormat,
+  floatingAdjustFontSize,
+  floatingApplyTextColor,
+  floatingApplyBgColor,
+  floatingAddPinyin,
+  floatingToggleFormatBrush,
+  floatingClearFormat,
   handleInput,
   handleChange,
   handleSelectionChange
@@ -216,6 +245,11 @@ function insertTemplate(template) {
 onMounted(() => {
   // 可以在这里添加额外的初始化逻辑
   console.log('TinyMCE 编辑器组件已挂载')
+  console.log('浮动工具栏状态:', {
+    showFloatingToolbar: showFloatingToolbar.value,
+    floatingToolbarSelection: floatingToolbarSelection.value,
+    currentFormats: currentFormats.value
+  })
 })
 </script>
 
