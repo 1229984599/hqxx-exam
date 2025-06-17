@@ -11,7 +11,10 @@ export function useErrorHandler() {
    * @param {Object} options - 配置选项
    */
   const handleApiError = (error, defaultMessage = '操作失败', options = {}) => {
-    console.error('API错误:', error)
+    // 只在开发环境下输出详细错误信息
+    if (import.meta.env.DEV) {
+      console.error('API错误:', error)
+    }
     
     const {
       showNotification = false,
@@ -216,7 +219,9 @@ export function setupGlobalErrorHandler() {
 
   // 监听未捕获的Promise错误
   window.addEventListener('unhandledrejection', (event) => {
-    console.error('未处理的Promise错误:', event.reason)
+    if (import.meta.env.DEV) {
+      console.error('未处理的Promise错误:', event.reason)
+    }
     
     if (event.reason?.response) {
       handleApiError(event.reason, '系统错误')
@@ -227,7 +232,9 @@ export function setupGlobalErrorHandler() {
 
   // 监听全局错误
   window.addEventListener('error', (event) => {
-    console.error('全局错误:', event.error)
+    if (import.meta.env.DEV) {
+      console.error('全局错误:', event.error)
+    }
     
     ElMessage({
       message: '系统发生错误，请刷新页面重试',

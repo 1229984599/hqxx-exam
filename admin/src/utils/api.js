@@ -67,7 +67,10 @@ api.interceptors.response.use(
     return response
   },
   error => {
-    console.error('API请求错误:', error)
+    // 只在开发环境下输出详细错误信息
+    if (import.meta.env.DEV) {
+      console.error('API请求错误:', error)
+    }
 
     // 网络错误
     if (!error.response) {

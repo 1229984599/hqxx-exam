@@ -105,8 +105,6 @@ async function initMonacoEditor() {
     for (let i = 0; i < cdnSources.length; i++) {
       const cdnUrl = cdnSources[i]
       try {
-        console.log(`尝试加载Monaco Editor，CDN: ${cdnUrl}`)
-
         // 重置loader配置
         loader.config({
           paths: {
@@ -124,19 +122,17 @@ async function initMonacoEditor() {
           timeoutPromise
         ])
 
-        console.log(`✅ Monaco Editor 加载成功，使用CDN: ${cdnUrl}`)
         break
       } catch (error) {
-        console.warn(`❌ CDN ${cdnUrl} 加载失败:`, error.message)
         if (i === cdnSources.length - 1) {
-          console.error('所有CDN源都加载失败')
+          // 只在所有CDN都失败时显示错误
+          ElMessage.error('Monaco Editor 加载失败，请检查网络连接')
         }
         continue
       }
     }
 
     if (!monaco) {
-      ElMessage.error('Monaco Editor 加载失败，请检查网络连接或联系管理员')
       throw new Error('所有CDN源都无法加载Monaco Editor')
     }
 
@@ -164,7 +160,7 @@ async function initMonacoEditor() {
       cursorStyle: 'line'
     })
 
-    console.log('Monaco Editor 创建成功，内容长度:', props.content?.length || 0)
+
 
     // 添加快捷键
     monacoEditor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyS, () => {
@@ -172,7 +168,7 @@ async function initMonacoEditor() {
     })
 
   } catch (error) {
-    console.error('Monaco Editor 初始化失败:', error)
+    ElMessage.error('Monaco Editor 初始化失败')
   }
 }
 
@@ -191,7 +187,7 @@ async function formatCode() {
   try {
     await monacoEditor.getAction('editor.action.formatDocument').run()
   } catch (error) {
-    console.error('格式化失败:', error)
+    ElMessage.error('代码格式化失败')
   } finally {
     formatting.value = false
   }
@@ -228,7 +224,7 @@ async function applyCode() {
     emit('apply', currentValue)
     visible.value = false
   } catch (error) {
-    console.error('应用代码失败:', error)
+    ElMessage.error('应用代码失败')
   } finally {
     applying.value = false
   }
