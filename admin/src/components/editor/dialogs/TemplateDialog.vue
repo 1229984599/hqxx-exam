@@ -161,11 +161,11 @@
 </template>
 
 <script setup>
-import { ref, computed, watch, onMounted } from 'vue'
-import { Search } from '@element-plus/icons-vue'
-import { ElMessage } from 'element-plus'
+import {computed, ref, watch} from 'vue'
+import {Search} from '@element-plus/icons-vue'
+import {ElMessage} from 'element-plus'
 import api from '../../../utils/api.js'
-import { useAuthStore } from '../../../stores/auth.js'
+import {useAuthStore} from '../../../stores/auth.js'
 
 const props = defineProps({
   modelValue: {
@@ -247,13 +247,15 @@ function isTianzigeTemplate(template) {
 function isCalculationTemplate(template) {
   if (!template || !template.content) return false
 
+
+
   // 检查模板内容是否包含计算题相关的类名或结构
   const content = template.content.toLowerCase()
   const name = template.name ? template.name.toLowerCase() : ''
   const category = template.category ? template.category.toLowerCase() : ''
   const description = template.description ? template.description.toLowerCase() : ''
 
-  return content.includes('calculation') ||
+  const isCalculation = content.includes('calculation') ||
          content.includes('神机妙算') ||
          content.includes('计算题') ||
          content.includes('{{calculation_') ||
@@ -266,10 +268,14 @@ function isCalculationTemplate(template) {
          category.includes('计算') ||
          description.includes('计算题') ||
          description.includes('算式')
+
+  return isCalculation
 }
 
 // 处理模板点击
 function handleTemplateClick(template) {
+
+
   if (isTianzigeTemplate(template) || isCalculationTemplate(template)) {
     // 如果是田字格模板或计算题模板，显示替换输入框
     selectedTemplate.value = template
@@ -425,14 +431,8 @@ function replaceCalculationText(template, newText) {
   // 显示解析结果
   ElMessage.success(`成功解析到 ${calculations.length} 个算式`)
 
-  // 直接使用动态生成的方式，根据算式数量创建相应数量的题目
-  // 提取模板中第一个算式项的样式作为模板
-  const itemTemplate = extractCalculationItemTemplate(template.content)
-
-  // 根据解析到的算式数量动态生成内容
-  const generatedContent = calculations.map(calc => {
-    return itemTemplate.replace(/\d+[\+\-×÷\*\/]+\d+[\+\-×÷\*\/\d]*\s*=?\s*/, calc)
-  }).join('')
+  // 参考田字格的实现方式，直接生成完整的计算题布局
+  const generatedContent = generateCalculationLayout(calculations)
 
   return {
     ...template,
@@ -441,42 +441,35 @@ function replaceCalculationText(template, newText) {
   }
 }
 
-// 提取计算题项目模板
-function extractCalculationItemTemplate(content) {
-  // 查找第一个包含算式的段落作为模板
-  const patterns = [
-    // 匹配完整的 p 标签（包含算式）
-    /<p[^>]*>.*?\d+[\+\-×÷\*\/]+\d+[\+\-×÷\*\/\d]*\s*=?\s*.*?<\/p>/i,
-    // 备用：简单的 p 标签模板
-    /<p[^>]*>.*?<\/p>/i
-  ]
-
-  for (const pattern of patterns) {
-    const match = content.match(pattern)
-    if (match) {
-      return match[0]
-    }
-  }
-
-  // 如果没有找到合适的模板，使用默认样式
-  return `<p class="MsoNormal" style="text-align: center;">
-    <strong><span style="font-family: 方正仿宋_GBK; font-size: 42px;">算式占位符</span></strong>
+// 生成计算题布局（根据用户输入的算式数量动态生成）
+function generateCalculationLayout(calculations) {
+  // 基础算式样式模板（从您的原模板中提取）
+  const baseTemplate = `<p class="MsoNormal" style="text-align: center;">
+    <strong><span style="font-family: '微软雅黑', 'Microsoft YaHei', Arial, sans-serif;font-size: 42px;">CALCULATION_PLACEHOLDER</span></strong>
   </p>`
+
+  // 根据用户输入的算式数量动态生成相应数量的算式
+  const calculationItems = calculations.map(calc =>
+    baseTemplate.replace('CALCULATION_PLACEHOLDER', calc)
+  ).join('')
+
+  return calculationItems
 }
+
+
 
 // 解析计算题文本，提取算式
 function parseCalculations(text) {
   if (!text) return []
 
+
   // 预处理：移除多余的空格和换行
   const cleanText = text.replace(/\s+/g, ' ').trim()
 
-  // 更精确的算式匹配模式
+  // 更简单直接的匹配模式，考虑运算符和数字之间的空格
   const patterns = [
-    // 复杂算式：如 27+3+5= 或 38-8+52=
-    /\d+(?:[+\-×÷\*\/]\d+)+\s*=?/g,
-    // 简单算式：如 83-2= 或 69-4=
-    /\d+\s*[+\-×÷\*\/]\s*\d+\s*=?/g
+    // 匹配所有可能的算式格式，允许运算符前后有空格
+    /\d+\s*[\+\-×÷\*\/]\s*\d+(?:\s*[\+\-×÷\*\/]\s*\d+)*\s*=?/g
   ]
 
   let allMatches = []
@@ -487,17 +480,16 @@ function parseCalculations(text) {
     allMatches = allMatches.concat(matches)
   }
 
-  // 如果没有匹配到，尝试按空格或其他分隔符分割
+  // 如果没有匹配到，尝试按空格分割
   if (allMatches.length === 0) {
-    const parts = cleanText.split(/[\s,，、]+/).filter(part => part.trim())
+    const parts = cleanText.split(/\s+/).filter(part => part.trim())
     for (const part of parts) {
-      if (/\d+[+\-×÷\*\/]\d+/.test(part)) {
+      if (/\d+\s*[\+＋\-×÷\*\/]\s*\d+/.test(part)) {
         allMatches.push(part)
       }
     }
   }
-
-  // 去重并清理
+  // 去重
   const uniqueMatches = [...new Set(allMatches)]
 
   return uniqueMatches.map(calc => {
@@ -505,16 +497,20 @@ function parseCalculations(text) {
     let cleaned = calc.replace(/\s+/g, '')
 
     // 统一运算符
-    cleaned = cleaned.replace(/\*/g, '×').replace(/\//g, '÷')
+    cleaned = cleaned.replace(/\*/g, '×').replace(/\//g, '÷').replace(/＋/g, '+')
 
-    // 确保有等号和空格（保持美观）
+    // 在所有运算符前后添加空格
+    cleaned = cleaned.replace(/([+\-×÷])/g, ' $1 ')
+
+    // 清理多余的空格
+    cleaned = cleaned.replace(/\s+/g, ' ').trim()
+
+    // 确保有等号
     if (!cleaned.endsWith('=')) {
-      cleaned += '='
-    }
-
-    // 在等号前添加空格（如果没有的话）
-    if (!cleaned.includes(' =')) {
-      cleaned = cleaned.replace('=', ' =')
+      cleaned += ' ='
+    } else {
+      // 如果已经有等号，确保等号前有空格
+      cleaned = cleaned.replace(/\s*=\s*$/, ' =')
     }
 
     return cleaned
