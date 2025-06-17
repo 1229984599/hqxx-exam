@@ -101,7 +101,11 @@
 
       <!-- 主内容 -->
       <main class="main-content">
-        <RouterView />
+        <RouterView v-slot="{ Component, route }">
+          <KeepAlive :include="['QuestionView']">
+            <component :is="Component" :key="route.fullPath" />
+          </KeepAlive>
+        </RouterView>
       </main>
     </div>
 

@@ -46,6 +46,19 @@
       :before-close="closeBatchUpdateDialog"
     >
       <el-form :model="batchUpdateForm" label-width="100px">
+        <el-form-item label="题目标题">
+          <el-input
+            v-model="batchUpdateForm.title"
+            placeholder="输入新的题目标题（留空则不修改）"
+            clearable
+            maxlength="200"
+            show-word-limit
+          />
+          <div class="form-tip">
+            💡 提示：如果填写标题，所有选中的试题标题都会被替换为此内容
+          </div>
+        </el-form-item>
+
         <el-form-item label="学期">
           <el-select v-model="batchUpdateForm.semester_id" placeholder="选择学期" clearable>
             <el-option
@@ -217,6 +230,7 @@ const batchLoading = ref(false)
 
 // 表单数据
 const batchUpdateForm = ref({
+  title: '',
   semester_id: null,
   grade_id: null,
   subject_id: null,
@@ -306,7 +320,7 @@ async function handleBatchUpdate() {
 
   try {
     batchLoading.value = true
-    
+
     // 过滤掉空值
     const updateData = {}
     Object.keys(batchUpdateForm.value).forEach(key => {
@@ -314,10 +328,23 @@ async function handleBatchUpdate() {
         updateData[key] = batchUpdateForm.value[key]
       }
     })
-    
+
     if (Object.keys(updateData).length === 0) {
       ElMessage.warning('请至少选择一个要更新的字段')
       return
+    }
+
+    // 如果要更新标题，给出特别提示
+    if (updateData.title) {
+      await ElMessageBox.confirm(
+        `确定要将选中的 ${props.selectedItems.length} 个试题的标题都修改为"${updateData.title}"吗？此操作不可恢复。`,
+        '批量修改标题确认',
+        {
+          confirmButtonText: '确认修改',
+          cancelButtonText: '取消',
+          type: 'warning'
+        }
+      )
     }
 
     await api.post('/questions/batch/update', {
@@ -329,8 +356,10 @@ async function handleBatchUpdate() {
     closeBatchUpdateDialog()
     emit('refresh')
   } catch (error) {
-    console.error('批量更新失败:', error)
-    ElMessage.error('批量更新失败')
+    if (error !== 'cancel') {
+      console.error('批量更新失败:', error)
+      ElMessage.error('批量更新失败')
+    }
   } finally {
     batchLoading.value = false
   }
@@ -400,6 +429,7 @@ async function handleBatchDelete() {
 function closeBatchUpdateDialog() {
   showBatchUpdateDialog.value = false
   batchUpdateForm.value = {
+    title: '',
     semester_id: null,
     grade_id: null,
     subject_id: null,
@@ -472,5 +502,13 @@ function closeBatchCopyDialog() {
   .batch-actions {
     justify-content: center;
   }
+}
+
+/* 表单提示样式 */
+.form-tip {
+  font-size: 12px;
+  color: #909399;
+  margin-top: 4px;
+  line-height: 1.4;
 }
 </style>

@@ -16,8 +16,9 @@
           v-model="content"
           placeholder="请输入内容进行测试..."
           :height="500"
-          :show-pinyin-tools="true"
-          :show-word-count="true"
+          :show-status-bar="false"
+          :show-shortcuts="false"
+          :auto-style-images="true"
         />
         
         <div class="content-preview" v-if="showPreview">
@@ -102,7 +103,7 @@
 <script setup>
 import { ref } from 'vue'
 import { ElMessage } from 'element-plus'
-import TinyMCEEditor from '../components/TinyMCEEditor.vue'
+import TinyMCEEditor from '../components/editor/TinyMCEEditor.vue'
 import PageLayout from '../components/PageLayout.vue'
 
 const content = ref('')

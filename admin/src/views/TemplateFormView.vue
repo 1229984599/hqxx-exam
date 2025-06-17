@@ -107,8 +107,9 @@
               v-model="form.content"
               placeholder="请输入模板内容，支持富文本编辑"
               :height="800"
-              :show-pinyin-tools="true"
-              :show-word-count="false"
+              :show-status-bar="false"
+              :show-shortcuts="false"
+              :auto-style-images="true"
               :toolbar-mode="'wrap'"
             />
           </div>
@@ -170,7 +171,7 @@ import { ElMessage } from 'element-plus'
 import { View, Warning } from '@element-plus/icons-vue'
 import api from '../utils/api'
 import PageLayout from '../components/PageLayout.vue'
-import TinyMCEEditor from '../components/TinyMCEEditor.vue'
+import TinyMCEEditor from '../components/editor/TinyMCEEditor.vue'
 
 const route = useRoute()
 const router = useRouter()

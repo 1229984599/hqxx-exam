@@ -21,7 +21,7 @@ async def get_categories(
     is_active: bool = Query(None, description="是否激活"),
     search: str = Query(None, description="搜索关键词"),
     skip: int = Query(0, ge=0, description="跳过数量"),
-    limit: int = Query(100, ge=1, le=100, description="限制数量")
+    limit: int = Query(100, ge=1, le=1000, description="限制数量")
 ):
     """获取分类列表"""
     query = Category.all()

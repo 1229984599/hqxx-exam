@@ -25,6 +25,8 @@
             :prefix-icon="Search"
             clearable
             style="width: 250px"
+            @input="handleSearchInput"
+            @clear="loadQuestions"
           />
         </el-form-item>
         
@@ -66,6 +68,8 @@
             placeholder="学科"
             clearable
             style="width: 140px"
+            @change="handleSubjectChange"
+            :loading="loading"
           >
             <el-option
               v-for="subject in subjects"
@@ -73,6 +77,53 @@
               :label="subject.name"
               :value="subject.id"
             />
+          </el-select>
+        </el-form-item>
+
+        <el-form-item>
+          <el-select
+            v-model="filters.category_id"
+            placeholder="分类"
+            clearable
+            style="width: 140px"
+            :disabled="!filters.subject_id"
+          >
+            <el-option
+              v-for="category in filteredCategories"
+              :key="category.id"
+              :label="category.name"
+              :value="category.id"
+            />
+          </el-select>
+        </el-form-item>
+
+        <el-form-item>
+          <el-select
+            v-model="filters.question_type"
+            placeholder="题目类型"
+            clearable
+            style="width: 140px"
+          >
+            <el-option label="单选题" value="single" />
+            <el-option label="多选题" value="multiple" />
+            <el-option label="填空题" value="fill" />
+            <el-option label="判断题" value="judge" />
+            <el-option label="问答题" value="essay" />
+          </el-select>
+        </el-form-item>
+
+        <el-form-item>
+          <el-select
+            v-model="filters.difficulty"
+            placeholder="难度"
+            clearable
+            style="width: 120px"
+          >
+            <el-option label="很简单" :value="1" />
+            <el-option label="简单" :value="2" />
+            <el-option label="中等" :value="3" />
+            <el-option label="困难" :value="4" />
+            <el-option label="很困难" :value="5" />
           </el-select>
         </el-form-item>
 
@@ -97,8 +148,33 @@
       @refresh="loadQuestions"
     />
 
+    <!-- 空状态 -->
+    <div v-if="!loading && questions.length === 0" class="empty-state">
+      <el-empty
+        :description="getEmptyDescription()"
+        :image-size="120"
+      >
+        <el-button
+          v-if="!hasFilters"
+          type="primary"
+          @click="$router.push('/questions/add')"
+          :icon="Plus"
+        >
+          添加第一个试题
+        </el-button>
+        <el-button
+          v-else
+          @click="resetFilters"
+          :icon="Refresh"
+        >
+          清除筛选条件
+        </el-button>
+      </el-empty>
+    </div>
+
     <!-- 数据表格 -->
     <el-table
+      v-else
       :data="questions"
       v-loading="loading"
       class="modern-table"
@@ -113,10 +189,17 @@
           </div>
         </template>
       </el-table-column>
-      <el-table-column prop="difficulty" label="简要" min-width="300" align="center">
+      <el-table-column prop="content" label="内容简要" min-width="300">
         <template #default="{ row }">
-
-            {{getContentSummary(row.content)}}
+          <div class="content-summary">
+            <p class="summary-text">{{ getContentSummary(row.content, 50) }}</p>
+            <div class="content-meta">
+              <el-tag size="small" type="info">{{ getQuestionTypeText(row.question_type) }}</el-tag>
+              <el-tag size="small" :type="getDifficultyType(row.difficulty)">
+                {{ getDifficultyText(row.difficulty) }}
+              </el-tag>
+            </div>
+          </div>
         </template>
       </el-table-column>
       <el-table-column align="center" prop="category.name" label="题目分类" width="120">
@@ -129,17 +212,6 @@
               {{ row.category?.name || '未分类' }}
             </el-tag>
           </div>
-        </template>
-      </el-table-column>
-
-      <el-table-column align="center" prop="question_type" label="题目类型" width="120">
-        <template #default="{ row }">
-          <el-tag
-            size="small"
-            :type="getQuestionTypeColor(row.question_type)"
-          >
-            {{ getQuestionTypeText(row.question_type) }}
-          </el-tag>
         </template>
       </el-table-column>
 
@@ -170,28 +242,21 @@
         </template>
       </el-table-column>
 
-      <el-table-column prop="difficulty" label="难度" width="100" align="center">
-        <template #default="{ row }">
-          <el-tag
-            :type="getDifficultyType(row.difficulty)"
-            size="small"
-          >
-            {{ getDifficultyText(row.difficulty) }}
-          </el-tag>
-        </template>
-      </el-table-column>
-      
-
-      
       <el-table-column prop="is_published" align="center" label="状态" width="100">
         <template #default="{ row }">
-          <el-tag :type="row.is_published ? 'success' : 'warning'" size="small">
+          <el-tag
+            :type="row.is_published ? 'success' : 'warning'"
+            size="small"
+            style="cursor: pointer"
+            @click="togglePublishStatus(row)"
+            v-permission="'questions:edit'"
+          >
             {{ row.is_published ? '已发布' : '草稿' }}
           </el-tag>
         </template>
       </el-table-column>
       <el-table-column prop="view_count" align="center" label="查看次数" width="120" />
-      <el-table-column label="操作" align="center" width="160" fixed="right">
+      <el-table-column label="操作" align="center" width="200" fixed="right">
         <template #default="{ row }">
           <div class="action-buttons">
             <el-button
@@ -199,6 +264,15 @@
               size="small"
               @click="$router.push(`/questions/edit/${row.id}`)"
               :icon="Edit"
+              title="编辑试题"
+            />
+            <el-button
+              v-permission="'questions:create'"
+              size="small"
+              type="success"
+              @click="copyQuestion(row)"
+              :icon="CopyDocument"
+              title="复制试题"
             />
             <el-button
               v-permission="'questions:delete'"
@@ -206,6 +280,7 @@
               type="danger"
               @click="deleteQuestion(row)"
               :icon="Delete"
+              title="删除试题"
             />
           </div>
         </template>
@@ -227,29 +302,47 @@
   </PageLayout>
 </template>
 
-<script setup>
-import { ref, reactive, onMounted } from 'vue'
-import { Plus, Edit, Delete, Search, Refresh } from '@element-plus/icons-vue'
+<script setup name="QuestionView">
+import { ref, reactive, onMounted, computed, watch } from 'vue'
+import { useRouter } from 'vue-router'
+import { Plus, Edit, Delete, Search, Refresh, CopyDocument } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import api from '../utils/api'
 import { getDifficultyText, getDifficultyType, getQuestionTypeText } from '../composables/useCrud'
 import { usePermissions } from '../composables/usePermissions'
+import { useErrorHandler } from '../composables/useErrorHandler'
 import PageLayout from '../components/PageLayout.vue'
 import BatchOperations from '../components/BatchOperations.vue'
 
 const { hasRole, hasAnyRole, isAdmin, isTeacher, isSubjectAdmin } = usePermissions()
+const { handleApiError } = useErrorHandler()
+const router = useRouter()
 
 const loading = ref(false)
+
+// 根据选择的学科过滤分类
+const filteredCategories = computed(() => {
+  if (!filters.subject_id) {
+    return []
+  }
+  return categories.value.filter(category => category.subject_id === filters.subject_id)
+})
+
+// 检查是否有筛选条件
+const hasFilters = computed(() => {
+  return Object.values(filters).some(value => value !== null && value !== '')
+})
 
 const questions = ref([])
 const selectedQuestions = ref([])
 const semesters = ref([])
 const grades = ref([])
 const subjects = ref([])
+const categories = ref([])
 
 const pagination = reactive({
   page: 1,
-  size: 20,
+  size: 10,
   total: 0
 })
 
@@ -257,6 +350,9 @@ const filters = reactive({
   semester_id: null,
   grade_id: null,
   subject_id: null,
+  category_id: null,
+  question_type: null,
+  difficulty: null,
   search: ''
 })
 
@@ -267,19 +363,22 @@ onMounted(() => {
 
 async function loadBasicData() {
   try {
-    const [semestersRes, gradesRes, subjectsRes] = await Promise.all([
+    const [semestersRes, gradesRes, subjectsRes, categoriesRes] = await Promise.all([
       api.get('/semesters/'),
       api.get('/grades/'),
-      api.get('/subjects/')
+      api.get('/subjects/'),
+      api.get('/categories/', { params: { limit: 1000 } }) // 加载所有分类，不限制数量
     ])
 
     semesters.value = semestersRes.data
     grades.value = gradesRes.data
     subjects.value = subjectsRes.data
+    categories.value = categoriesRes.data
   } catch (error) {
-    console.error('加载基础数据失败:', error)
-    const errorMessage = error.response?.data?.detail || error.message || '加载基础数据失败'
-    ElMessage.error(errorMessage)
+    handleApiError(error, '加载基础数据失败', {
+      showRetry: true,
+      onRetry: loadBasicData
+    })
   }
 }
 
@@ -295,6 +394,9 @@ async function loadQuestions() {
     if (filters.semester_id) params.semester_id = filters.semester_id
     if (filters.grade_id) params.grade_id = filters.grade_id
     if (filters.subject_id) params.subject_id = filters.subject_id
+    if (filters.category_id) params.category_id = filters.category_id
+    if (filters.question_type) params.question_type = filters.question_type
+    if (filters.difficulty) params.difficulty = filters.difficulty
     if (filters.search) params.search = filters.search
 
     const response = await api.get('/questions/', { params })
@@ -341,31 +443,15 @@ async function loadQuestions() {
       category: question.category || null
     }))
 
-    // 如果没有数据，显示友好提示
-    if (questions.value.length === 0 && pagination.page === 1) {
-      if (Object.values(filters).some(v => v)) {
-        ElMessage.info('没有找到符合条件的试题，请调整筛选条件')
-      } else {
-        ElMessage.info('暂无试题数据，点击"添加试题"开始创建')
-      }
-    }
+
   } catch (error) {
-    console.error('加载试题列表失败:', error)
     questions.value = [] // 确保在错误时清空数据
     pagination.total = 0
 
-    const errorMessage = error.response?.data?.detail || error.message || '加载试题列表失败'
-    ElMessage.error(errorMessage)
-
-    // 网络错误时显示重试按钮
-    if (error.code === 'NETWORK_ERROR') {
-      ElMessage({
-        message: '网络连接失败，请检查网络后重试',
-        type: 'error',
-        showClose: true,
-        duration: 0
-      })
-    }
+    handleApiError(error, '加载试题列表失败', {
+      showRetry: true,
+      onRetry: loadQuestions
+    })
   } finally {
     loading.value = false
   }
@@ -419,6 +505,9 @@ function resetFilters() {
     semester_id: null,
     grade_id: null,
     subject_id: null,
+    category_id: null,
+    question_type: null,
+    difficulty: null,
     search: ''
   })
   pagination.page = 1
@@ -451,6 +540,138 @@ function handleSelectionChange(selection) {
   selectedQuestions.value = selection
 }
 
+// 实时搜索防抖
+let searchTimeout = null
+function handleSearchInput() {
+  if (searchTimeout) {
+    clearTimeout(searchTimeout)
+  }
+  searchTimeout = setTimeout(() => {
+    pagination.page = 1
+    loadQuestions()
+  }, 500) // 500ms防抖
+}
+
+// 处理学科变化
+function handleSubjectChange(subjectId) {
+  // 当学科变化时，清空分类选择
+  if (filters.category_id) {
+    // 检查当前选择的分类是否属于新选择的学科
+    const currentCategory = categories.value.find(cat => cat.id === filters.category_id)
+    if (!currentCategory || currentCategory.subject_id !== subjectId) {
+      filters.category_id = null
+    }
+  }
+
+  // 重新加载试题
+  pagination.page = 1
+  loadQuestions()
+}
+
+// 复制试题
+async function copyQuestion(question) {
+  try {
+    await ElMessageBox.confirm(
+      `确定要复制试题"${question.title}"吗？复制后将自动跳转到编辑页面。`,
+      '复制试题确认',
+      {
+        confirmButtonText: '确认复制',
+        cancelButtonText: '取消',
+        type: 'info'
+      }
+    )
+
+    const copyLoading = ElMessage({
+      message: '正在复制试题...',
+      type: 'info',
+      duration: 0
+    })
+
+    try {
+      // 调用后端复制API
+      const response = await api.post('/questions/batch/copy', {
+        question_ids: [question.id],
+        target_semester_id: question.semester_id,
+        target_grade_id: question.grade_id,
+        target_subject_id: question.subject_id,
+        target_category_id: question.category_id
+      })
+
+      copyLoading.close()
+
+      // 获取复制后的试题ID
+      const copiedQuestionIds = response.data.copied_question_ids
+
+      if (copiedQuestionIds && copiedQuestionIds.length > 0) {
+        const copiedQuestionId = copiedQuestionIds[0]
+        ElMessage.success('试题复制成功，正在跳转到编辑页面...')
+        // 跳转到复制后试题的编辑页面
+        setTimeout(() => {
+          router.push(`/questions/edit/${copiedQuestionId}`)
+        }, 500)
+      } else {
+        ElMessage.success('试题复制成功')
+        loadQuestions() // 刷新列表
+      }
+    } catch (copyError) {
+      copyLoading.close()
+      console.error('复制试题失败:', copyError)
+      const errorMessage = copyError.response?.data?.detail || copyError.message || '复制试题失败'
+      ElMessage.error(errorMessage)
+    }
+  } catch (error) {
+    if (error !== 'cancel') {
+      console.error('复制操作异常:', error)
+      ElMessage.error('复制操作失败')
+    }
+  }
+}
+
+// 切换发布状态
+async function togglePublishStatus(question) {
+  try {
+    const newStatus = !question.is_published
+    const statusText = newStatus ? '发布' : '取消发布'
+
+    await ElMessageBox.confirm(
+      `确定要${statusText}试题"${question.title}"吗？`,
+      `${statusText}确认`,
+      {
+        confirmButtonText: `确认${statusText}`,
+        cancelButtonText: '取消',
+        type: 'info'
+      }
+    )
+
+    const updateLoading = ElMessage({
+      message: `正在${statusText}试题...`,
+      type: 'info',
+      duration: 0
+    })
+
+    try {
+      await api.put(`/questions/${question.id}`, {
+        is_published: newStatus
+      })
+
+      updateLoading.close()
+      ElMessage.success(`试题${statusText}成功`)
+
+      // 更新本地数据
+      question.is_published = newStatus
+    } catch (updateError) {
+      updateLoading.close()
+      console.error(`${statusText}试题失败:`, updateError)
+      const errorMessage = updateError.response?.data?.detail || updateError.message || `${statusText}试题失败`
+      ElMessage.error(errorMessage)
+    }
+  } catch (error) {
+    if (error !== 'cancel') {
+      console.error('切换发布状态异常:', error)
+    }
+  }
+}
+
 /**
  * 获取内容简介
  * @param text
@@ -473,6 +694,16 @@ function getContentSummary(text, length = 30) {
   // 如果有中文字符，返回前length个中文字符
   const summary = chineseChars.slice(0, length).join('')
   return summary + (chineseChars.length > length ? '...' : '')
+}
+
+/**
+ * 获取空状态描述
+ */
+function getEmptyDescription() {
+  if (hasFilters.value) {
+    return '没有找到符合条件的试题，请调整筛选条件'
+  }
+  return '暂无试题数据，点击下方按钮开始创建第一个试题'
 }
 </script>
 
@@ -517,6 +748,23 @@ function getContentSummary(text, length = 30) {
   display: flex;
   gap: 8px;
   justify-content: center;
+}
+
+.content-summary {
+  text-align: left;
+}
+
+.summary-text {
+  margin: 0 0 8px 0;
+  line-height: 1.4;
+  color: #606266;
+  font-size: 14px;
+}
+
+.content-meta {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
 }
 
 .pagination-section {
@@ -600,5 +848,26 @@ function getContentSummary(text, length = 30) {
 .action-buttons .el-button:hover {
   transform: translateY(-1px);
   box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+}
+
+/* 空状态样式 */
+.empty-state {
+  background: rgba(255, 255, 255, 0.8);
+  backdrop-filter: blur(10px);
+  border-radius: 12px;
+  padding: 40px 20px;
+  margin-bottom: 24px;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  text-align: center;
+}
+
+.empty-state :deep(.el-empty__description) {
+  color: #6b7280;
+  font-size: 16px;
+  margin-bottom: 20px;
+}
+
+.empty-state :deep(.el-empty__image) {
+  margin-bottom: 20px;
 }
 </style>

@@ -8,7 +8,6 @@ let authStoreInstance = null
 // 设置auth store实例（由main.js调用）
 export function setAuthStore(store) {
   authStoreInstance = store
-  console.log('🔗 Auth store已设置到API模块')
 }
 
 // 获取auth store实例
@@ -31,29 +30,25 @@ api.interceptors.request.use(
     try {
       const store = getAuthStore()
       let token = null
-      let tokenSource = ''
 
       if (store && store.token) {
         // 从auth store获取token（推荐方式）
         token = store.token
-        tokenSource = 'auth-store'
-        console.log('✅ 从auth-store获取token')
       } else {
         // 回退到localStorage方式（兼容性）
         const authData = localStorage.getItem('auth-store')
         if (authData) {
-          const parsedData = JSON.parse(authData)
-          token = parsedData.token
-          tokenSource = 'localStorage'
-          console.log('⚠️ 从localStorage获取token（回退方式）')
+          try {
+            const parsedData = JSON.parse(authData)
+            token = parsedData.token
+          } catch (parseError) {
+            console.error('❌ 解析localStorage中的auth数据失败:', parseError)
+          }
         }
       }
 
-      if (token) {
+      if (token && token.trim()) {
         config.headers.Authorization = `Bearer ${token}`
-        console.log(`✅ Token已添加到请求头 (来源: ${tokenSource})`)
-      } else {
-        console.warn('⚠️ 未找到token')
       }
     } catch (error) {
       console.error('❌ 获取token失败:', error)

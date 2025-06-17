@@ -66,6 +66,10 @@ async def get_questions(
     if search:
         query = query.filter(title__icontains=search)
 
+    # 获取总数（在分页之前）
+    total = await query.count()
+
+    # 执行分页查询
     questions = await query.offset(skip).limit(limit).order_by("-created_at")
 
     # 手动序列化避免循环引用
@@ -113,7 +117,14 @@ async def get_questions(
         }
         result.append(question_dict)
 
-    return result
+    # 返回分页格式的数据
+    return {
+        "items": result,
+        "total": total,
+        "page": (skip // limit) + 1,
+        "size": limit,
+        "pages": (total + limit - 1) // limit  # 总页数
+    }
 
 
 @router.get("/random", summary="随机获取试题")

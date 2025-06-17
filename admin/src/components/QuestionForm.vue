@@ -105,10 +105,12 @@
         <el-col :span="24">
           <el-form-item label="题目内容" prop="content">
             <TinyMCEEditor
-                api-key="gpl"
               v-model="form.content"
               :height="400"
               :toolbar-mode="'wrap'"
+              :show-status-bar="false"
+              :show-shortcuts="false"
+              :auto-style-images="true"
               placeholder="请输入题目内容，支持富文本编辑和拼音注音"
             />
           </el-form-item>
@@ -119,9 +121,11 @@
         <el-col :span="24">
           <el-form-item label="参考答案" prop="answer">
             <TinyMCEEditor
-                api-key="gpl"
               v-model="form.answer"
               :height="200"
+              :show-status-bar="false"
+              :show-shortcuts="false"
+              :auto-style-images="true"
               placeholder="请输入参考答案（可选）"
             />
           </el-form-item>
@@ -181,7 +185,7 @@
 <script setup>
 import { ref, computed, watch } from 'vue'
 import { View } from '@element-plus/icons-vue'
-import TinyMCEEditor from './TinyMCEEditor.vue'
+import TinyMCEEditor from './editor/TinyMCEEditor.vue'
 
 const props = defineProps({
   form: {
