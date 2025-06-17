@@ -39,7 +39,7 @@
       </div>
 
       <!-- 田字格文字替换功能 -->
-      <div v-if="showTextReplaceInput" class="text-replace-section">
+      <div v-if="showTextReplaceInput && isTianzigeTemplate(selectedTemplate)" class="text-replace-section">
         <div class="replace-header">
           <h4>🔤 智能文字替换</h4>
           <p>输入要练习的文字，将自动替换到田字格模板中</p>
@@ -51,6 +51,53 @@
             :rows="3"
             placeholder="请输入要练习的中文字符，例如：春夏秋冬"
             maxlength="100"
+            show-word-limit
+            class="replace-textarea"
+          />
+
+          <!-- 田字格参数设置 -->
+          <div class="tianzige-settings">
+            <div class="setting-row">
+              <label>对齐方式：</label>
+              <el-radio-group v-model="tianzigeAlignment" size="small">
+                <el-radio label="center">居中对齐</el-radio>
+                <el-radio label="left">左对齐</el-radio>
+              </el-radio-group>
+            </div>
+            <div class="setting-row">
+              <label>每行个数：</label>
+              <el-input-number
+                v-model="tianzigePerRow"
+                :min="1"
+                :max="10"
+                size="small"
+                style="width: 120px;"
+              />
+            </div>
+          </div>
+
+          <div class="replace-actions">
+            <el-button @click="cancelTextReplace">取消</el-button>
+            <el-button type="primary" @click="applyTextReplace" :disabled="!replaceText.trim()">
+              应用替换
+            </el-button>
+          </div>
+        </div>
+      </div>
+
+      <!-- 计算题算式替换功能 -->
+      <div v-if="showTextReplaceInput && isCalculationTemplate(selectedTemplate)" class="text-replace-section">
+        <div class="replace-header">
+          <h4>🧮 智能算式替换</h4>
+          <p>输入计算题，将自动替换到神机妙算模板中</p>
+        </div>
+        <div class="replace-input-area">
+          <el-input
+            v-model="replaceText"
+            type="textarea"
+            :rows="4"
+            placeholder="请输入计算题，例如：18÷9=    49÷7=    81÷9=    7500-500="
+            maxlength="500"
             show-word-limit
             class="replace-textarea"
           />
@@ -88,6 +135,10 @@
             <!-- 田字格模板标识 -->
             <el-tag v-if="isTianzigeTemplate(template)" size="small" type="success">
               🔤 支持文字替换
+            </el-tag>
+            <!-- 计算题模板标识 -->
+            <el-tag v-if="isCalculationTemplate(template)" size="small" type="success">
+              🧮 支持算式替换
             </el-tag>
           </div>
           <div class="template-preview" v-html="getTemplatePreview(template.content)"></div>
@@ -141,6 +192,10 @@ const showTextReplaceInput = ref(false)
 const replaceText = ref('')
 const selectedTemplate = ref(null)
 
+// 田字格参数设置
+const tianzigeAlignment = ref('center') // 对齐方式：center 或 left
+const tianzigePerRow = ref(2) // 每行个数，默认2个
+
 // 计算属性
 const categories = computed(() => {
   const cats = [...new Set(templates.value.map(t => t.category))]
@@ -188,10 +243,35 @@ function isTianzigeTemplate(template) {
          template.category === '田字格'
 }
 
+// 判断是否为计算题模板
+function isCalculationTemplate(template) {
+  if (!template || !template.content) return false
+
+  // 检查模板内容是否包含计算题相关的类名或结构
+  const content = template.content.toLowerCase()
+  const name = template.name ? template.name.toLowerCase() : ''
+  const category = template.category ? template.category.toLowerCase() : ''
+  const description = template.description ? template.description.toLowerCase() : ''
+
+  return content.includes('calculation') ||
+         content.includes('神机妙算') ||
+         content.includes('计算题') ||
+         content.includes('{{calculation_') ||
+         content.includes('🧮') ||
+         name.includes('神机妙算') ||
+         name.includes('计算题') ||
+         name.includes('计算') ||
+         category.includes('计算题') ||
+         category.includes('神机妙算') ||
+         category.includes('计算') ||
+         description.includes('计算题') ||
+         description.includes('算式')
+}
+
 // 处理模板点击
 function handleTemplateClick(template) {
-  if (isTianzigeTemplate(template)) {
-    // 如果是田字格模板，显示文字替换输入框
+  if (isTianzigeTemplate(template) || isCalculationTemplate(template)) {
+    // 如果是田字格模板或计算题模板，显示替换输入框
     selectedTemplate.value = template
     showTextReplaceInput.value = true
   } else {
@@ -205,13 +285,24 @@ function cancelTextReplace() {
   showTextReplaceInput.value = false
   replaceText.value = ''
   selectedTemplate.value = null
+  // 重置田字格参数为默认值
+  tianzigeAlignment.value = 'center'
+  tianzigePerRow.value = 2
 }
 
 // 应用文字替换
 function applyTextReplace() {
   if (!selectedTemplate.value || !replaceText.value.trim()) return
 
-  const processedTemplate = replaceTemplateText(selectedTemplate.value, replaceText.value.trim())
+  let processedTemplate
+  if (isTianzigeTemplate(selectedTemplate.value)) {
+    processedTemplate = replaceTemplateText(selectedTemplate.value, replaceText.value.trim())
+  } else if (isCalculationTemplate(selectedTemplate.value)) {
+    processedTemplate = replaceCalculationText(selectedTemplate.value, replaceText.value.trim())
+  } else {
+    processedTemplate = selectedTemplate.value
+  }
+
   insertTemplate(processedTemplate)
 
   // 重置状态
@@ -230,52 +321,216 @@ function replaceTemplateText(template, newText) {
     return template
   }
 
-  let content = template.content
-  let charIndex = 0
+  // 显示解析结果
+  ElMessage.success(`成功解析到 ${chineseChars.length} 个汉字`)
 
-  // 只替换标签内部的中文字符，不替换属性和注释中的
-  content = content.replace(/>([^<]*)</g, (match, textContent) => {
-    // 只处理标签内的文本内容
-    const replacedText = textContent.replace(/[\u4e00-\u9fff]/g, (chineseChar) => {
-      if (charIndex < chineseChars.length) {
-        return chineseChars[charIndex++]
-      }
-      return chineseChar // 如果新文字不够，保持原字符
-    })
-    return `>${replacedText}<`
-  })
-
-  // 如果新文字比模板中的字符多，在末尾添加额外的田字格
-  if (charIndex < chineseChars.length) {
-    const remainingChars = chineseChars.slice(charIndex)
-    const additionalGrids = generateAdditionalTianzigeGrids(remainingChars)
-    content += additionalGrids
-  }
+  // 根据参数生成田字格布局
+  const generatedContent = generateTianzigeLayout(chineseChars, tianzigeAlignment.value, tianzigePerRow.value)
 
   return {
     ...template,
-    content: content,
-    name: `${template.name} - ${newText.substring(0, 10)}${newText.length > 10 ? '...' : ''}`
+    content: generatedContent,
+    name: `${template.name} - ${chineseChars.length}字`
   }
 }
 
-// 生成额外的田字格网格
+// 生成田字格布局
+function generateTianzigeLayout(chars, alignment = 'center', perRow = 2) {
+  // 基础田字格样式
+  const tianzigeStyle = `display: inline-block; width: 80px; height: 80px; border: 2px solid #333; position: relative; margin: 4px; text-align: center; line-height: 80px; font-size: 32px; background: #fafafa;`
+  const crossLineStyle = `position: absolute; background: #ccc; z-index: 1;`
+  const horizontalLine = `top: 50%; left: 0; right: 0; height: 1px;`
+  const verticalLine = `left: 50%; top: 0; bottom: 0; width: 1px;`
+  const charStyle = `font-size: 60px; font-weight: bold; color: #000; font-family: '楷体', 'KaiTi', serif; user-select: text;position: relative; z-index: 2;`
+
+  // 按每行个数分组
+  const rows = []
+  for (let i = 0; i < chars.length; i += perRow) {
+    rows.push(chars.slice(i, i + perRow))
+  }
+
+  // 生成每行的田字格
+  const rowsHtml = rows.map(rowChars => {
+    const tianzigeItems = rowChars.map(char =>
+      `<div class="tianzige-char" style="${tianzigeStyle}">
+        <div style="${crossLineStyle} ${horizontalLine}"></div>
+        <div style="${crossLineStyle} ${verticalLine}"></div>
+        <span style="${charStyle}">${char}</span>
+      </div>`
+    ).join('')
+
+    return `<div style="display: flex; ${alignment === 'center' ? 'justify-content: center;' : 'justify-content: flex-start;'} margin: 10px 0; flex-wrap: wrap;">
+      ${tianzigeItems}
+    </div>`
+  }).join('')
+
+  // 整体容器
+  return `<div style="text-align: ${alignment}; padding: 20px;">
+    <div style="margin: 0;">
+      ${rowsHtml}
+    </div>
+  </div>`
+}
+
+// 提取田字格项目模板
+function extractTianzigeItemTemplate(content) {
+  // 查找第一个包含田字格的div作为模板
+  const patterns = [
+    // 匹配完整的田字格 div（包含 tianzige-char 类）
+    /<div[^>]*class[^>]*tianzige-char[^>]*>.*?<\/div>/i,
+    // 匹配任何包含中文字符的div
+    /<div[^>]*>.*?[\u4e00-\u9fff].*?<\/div>/i,
+    // 备用：查找任何包含样式的div
+    /<div[^>]*style[^>]*>.*?<\/div>/i
+  ]
+
+  for (const pattern of patterns) {
+    const match = content.match(pattern)
+    if (match) {
+      return match[0]
+    }
+  }
+
+  // 如果没有找到合适的模板，使用默认田字格样式
+  return `<div class="tianzige-char" style="display: inline-block; width: 80px; height: 80px; border: 2px solid #333; position: relative; margin: 4px; text-align: center; line-height: 80px; font-size: 32px; background: #fafafa;">
+    <div style="position: absolute; top: 50%; left: 0; right: 0; height: 1px; background: #ccc; z-index: 1;"></div>
+    <div style="position: absolute; left: 50%; top: 0; bottom: 0; width: 1px; background: #ccc; z-index: 1;"></div>
+    <span style="position: relative; z-index: 2; color: #333;">字</span>
+  </div>`
+}
+
+// 生成额外的田字格网格（保持与新逻辑一致，但保留以防需要）
 function generateAdditionalTianzigeGrids(chars) {
-  // 这里需要根据实际的田字格HTML结构来生成
-  // 假设田字格的基本结构
-  let grids = ''
+  return chars.map(char =>
+    `<div class="tianzige-char" style="display: inline-block; width: 80px; height: 80px; border: 2px solid #333; position: relative; margin: 4px; text-align: center; line-height: 80px; font-size: 32px; background: #fafafa;">
+      <div style="position: absolute; top: 50%; left: 0; right: 0; height: 1px; background: #ccc; z-index: 1;"></div>
+      <div style="position: absolute; left: 50%; top: 0; bottom: 0; width: 1px; background: #ccc; z-index: 1;"></div>
+      <span style="position: relative; z-index: 2; color: #333;">${char}</span>
+    </div>`
+  ).join('')
+}
 
-  chars.forEach(char => {
-    grids += `
-      <div class="tianzige-char" style="display: inline-block; width: 60px; height: 60px; border: 1px solid #333; position: relative; margin: 2px; text-align: center; line-height: 60px; font-size: 24px;">
-        <div style="position: absolute; top: 50%; left: 0; right: 0; height: 1px; background: #ccc;"></div>
-        <div style="position: absolute; left: 50%; top: 0; bottom: 0; width: 1px; background: #ccc;"></div>
-        <span style="position: relative; z-index: 1;">${char}</span>
-      </div>
-    `
+// 替换计算题模板中的算式
+function replaceCalculationText(template, newText) {
+  if (!template.content) return template
+
+  // 解析计算题文本，提取算式
+  const calculations = parseCalculations(newText)
+
+  if (calculations.length === 0) {
+    ElMessage.warning('请输入有效的计算题，例如：18÷9= 或 27+3+5=')
+    return template
+  }
+
+  // 显示解析结果
+  ElMessage.success(`成功解析到 ${calculations.length} 个算式`)
+
+  // 直接使用动态生成的方式，根据算式数量创建相应数量的题目
+  // 提取模板中第一个算式项的样式作为模板
+  const itemTemplate = extractCalculationItemTemplate(template.content)
+
+  // 根据解析到的算式数量动态生成内容
+  const generatedContent = calculations.map(calc => {
+    return itemTemplate.replace(/\d+[\+\-×÷\*\/]+\d+[\+\-×÷\*\/\d]*\s*=?\s*/, calc)
+  }).join('')
+
+  return {
+    ...template,
+    content: generatedContent,
+    name: `${template.name} - ${calculations.length}题`
+  }
+}
+
+// 提取计算题项目模板
+function extractCalculationItemTemplate(content) {
+  // 查找第一个包含算式的段落作为模板
+  const patterns = [
+    // 匹配完整的 p 标签（包含算式）
+    /<p[^>]*>.*?\d+[\+\-×÷\*\/]+\d+[\+\-×÷\*\/\d]*\s*=?\s*.*?<\/p>/i,
+    // 备用：简单的 p 标签模板
+    /<p[^>]*>.*?<\/p>/i
+  ]
+
+  for (const pattern of patterns) {
+    const match = content.match(pattern)
+    if (match) {
+      return match[0]
+    }
+  }
+
+  // 如果没有找到合适的模板，使用默认样式
+  return `<p class="MsoNormal" style="text-align: center;">
+    <strong><span style="font-family: 方正仿宋_GBK; font-size: 42px;">算式占位符</span></strong>
+  </p>`
+}
+
+// 解析计算题文本，提取算式
+function parseCalculations(text) {
+  if (!text) return []
+
+  // 预处理：移除多余的空格和换行
+  const cleanText = text.replace(/\s+/g, ' ').trim()
+
+  // 更精确的算式匹配模式
+  const patterns = [
+    // 复杂算式：如 27+3+5= 或 38-8+52=
+    /\d+(?:[+\-×÷\*\/]\d+)+\s*=?/g,
+    // 简单算式：如 83-2= 或 69-4=
+    /\d+\s*[+\-×÷\*\/]\s*\d+\s*=?/g
+  ]
+
+  let allMatches = []
+
+  // 使用所有模式匹配
+  for (const pattern of patterns) {
+    const matches = cleanText.match(pattern) || []
+    allMatches = allMatches.concat(matches)
+  }
+
+  // 如果没有匹配到，尝试按空格或其他分隔符分割
+  if (allMatches.length === 0) {
+    const parts = cleanText.split(/[\s,，、]+/).filter(part => part.trim())
+    for (const part of parts) {
+      if (/\d+[+\-×÷\*\/]\d+/.test(part)) {
+        allMatches.push(part)
+      }
+    }
+  }
+
+  // 去重并清理
+  const uniqueMatches = [...new Set(allMatches)]
+
+  return uniqueMatches.map(calc => {
+    // 移除多余空格
+    let cleaned = calc.replace(/\s+/g, '')
+
+    // 统一运算符
+    cleaned = cleaned.replace(/\*/g, '×').replace(/\//g, '÷')
+
+    // 确保有等号和空格（保持美观）
+    if (!cleaned.endsWith('=')) {
+      cleaned += '='
+    }
+
+    // 在等号前添加空格（如果没有的话）
+    if (!cleaned.includes(' =')) {
+      cleaned = cleaned.replace('=', ' =')
+    }
+
+    return cleaned
+  }).filter(calc => {
+    // 过滤：必须包含运算符且长度合理
+    return calc.length >= 4 && /[+\-×÷]/.test(calc)
   })
+}
 
-  return grids
+// 生成额外的计算题行（每行一个算式）
+function generateAdditionalCalculationGrids(calculations) {
+  return calculations.map(calc =>
+    `<p style="text-align: center; margin: 20px 0; line-height: 1.8;">
+      <strong><span style="font-family: '微软雅黑', 'Microsoft YaHei', Arial, sans-serif; font-size: 36px; color: #333;">${calc}</span></strong>
+    </p>`
+  ).join('')
 }
 
 async function insertTemplate(template) {
@@ -319,7 +574,7 @@ async function refreshTemplates() {
       }
     })
     templates.value = response.data || []
-    ElMessage.success('模板列表已刷新')
+    // ElMessage.success('模板列表已刷新')
   } catch (error) {
     console.error('获取模板失败:', error)
     if (error.response?.status === 401) {
@@ -413,6 +668,32 @@ watch(visible, (newVal) => {
   display: flex;
   justify-content: flex-end;
   gap: 10px;
+}
+
+/* 田字格参数设置样式 */
+.tianzige-settings {
+  background: #f0f9ff;
+  border: 1px solid #e0f2fe;
+  border-radius: 6px;
+  padding: 15px;
+  margin: 15px 0;
+}
+
+.setting-row {
+  display: flex;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+.setting-row:last-child {
+  margin-bottom: 0;
+}
+
+.setting-row label {
+  min-width: 80px;
+  font-size: 14px;
+  color: #666;
+  margin-right: 10px;
 }
 
 .template-grid {

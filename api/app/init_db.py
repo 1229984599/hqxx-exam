@@ -220,6 +220,36 @@ async def init_db():
                 "subject": chinese,
                 "is_system": True,
                 "sort_order": 1
+            },
+            {
+                "name": "神机妙算",
+                "description": "计算题练习模板，支持智能算式替换",
+                "content": """
+                <div style="text-align: left; margin: 20px 0; padding: 20px; border: 2px dashed #409eff; border-radius: 10px;">
+                  <h3 style="color: #409eff; margin-bottom: 20px; text-align: center;">🧮 神机妙算</h3>
+                  <p style="margin-bottom: 15px; color: #606266; text-align: center;">请完成下列计算题：</p>
+                  <div style="margin: 30px 0; line-height: 2.5;">
+                    <div style="font-size: 24px; font-weight: bold; margin: 15px 0; padding: 10px; background: #f9f9f9; border-radius: 5px;">{{calculation_1}}</div>
+                    <div style="font-size: 24px; font-weight: bold; margin: 15px 0; padding: 10px; background: #f9f9f9; border-radius: 5px;">{{calculation_2}}</div>
+                    <div style="font-size: 24px; font-weight: bold; margin: 15px 0; padding: 10px; background: #f9f9f9; border-radius: 5px;">{{calculation_3}}</div>
+                    <div style="font-size: 24px; font-weight: bold; margin: 15px 0; padding: 10px; background: #f9f9f9; border-radius: 5px;">{{calculation_4}}</div>
+                    <div style="font-size: 24px; font-weight: bold; margin: 15px 0; padding: 10px; background: #f9f9f9; border-radius: 5px;">{{calculation_5}}</div>
+                    <div style="font-size: 24px; font-weight: bold; margin: 15px 0; padding: 10px; background: #f9f9f9; border-radius: 5px;">{{calculation_6}}</div>
+                    <div style="font-size: 24px; font-weight: bold; margin: 15px 0; padding: 10px; background: #f9f9f9; border-radius: 5px;">{{calculation_7}}</div>
+                    <div style="font-size: 24px; font-weight: bold; margin: 15px 0; padding: 10px; background: #f9f9f9; border-radius: 5px;">{{calculation_8}}</div>
+                    <div style="font-size: 24px; font-weight: bold; margin: 15px 0; padding: 10px; background: #f9f9f9; border-radius: 5px;">{{calculation_9}}</div>
+                    <div style="font-size: 24px; font-weight: bold; margin: 15px 0; padding: 10px; background: #f9f9f9; border-radius: 5px;">{{calculation_10}}</div>
+                  </div>
+                  <div style="margin-top: 20px; font-size: 14px; color: #909399; text-align: center;">
+                    💡 提示：点击模板时可以输入计算题，系统会自动替换算式
+                  </div>
+                </div>
+                """,
+                "category": "计算题",
+                "icon": "🧮",
+                "subject": math,
+                "is_system": True,
+                "sort_order": 2
             }
         ]
 
