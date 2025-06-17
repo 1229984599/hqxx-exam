@@ -41,6 +41,7 @@
 
 <script setup>
 import { ref, computed, watch, nextTick, onMounted, onBeforeUnmount } from 'vue'
+import { ElMessage } from 'element-plus'
 import loader from '@monaco-editor/loader'
 
 const props = defineProps({
@@ -91,14 +92,53 @@ async function initMonacoEditor() {
   if (!monacoContainer.value) return
 
   try {
-    // 配置Monaco Editor
-    loader.config({
-      paths: {
-        vs: 'https://cdn.jsdelivr.net/npm/monaco-editor@0.45.0/min/vs'
-      }
-    })
+    // 尝试多个CDN源，提高可用性（包含国内CDN）
+    const cdnSources = [
+      'https://cdn.jsdelivr.net/npm/monaco-editor@0.45.0/min/vs',
+      'https://unpkg.com/monaco-editor@0.45.0/min/vs',
+      'https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.45.0/min/vs',
+      'https://registry.npmmirror.com/monaco-editor/0.45.0/files/min/vs',
+      'https://cdn.bootcdn.net/ajax/libs/monaco-editor/0.45.0/min/vs'
+    ]
 
-    const monaco = await loader.init()
+    let monaco = null
+    for (let i = 0; i < cdnSources.length; i++) {
+      const cdnUrl = cdnSources[i]
+      try {
+        console.log(`尝试加载Monaco Editor，CDN: ${cdnUrl}`)
+
+        // 重置loader配置
+        loader.config({
+          paths: {
+            vs: cdnUrl
+          }
+        })
+
+        // 设置超时
+        const timeoutPromise = new Promise((_, reject) => {
+          setTimeout(() => reject(new Error('加载超时')), 10000)
+        })
+
+        monaco = await Promise.race([
+          loader.init(),
+          timeoutPromise
+        ])
+
+        console.log(`✅ Monaco Editor 加载成功，使用CDN: ${cdnUrl}`)
+        break
+      } catch (error) {
+        console.warn(`❌ CDN ${cdnUrl} 加载失败:`, error.message)
+        if (i === cdnSources.length - 1) {
+          console.error('所有CDN源都加载失败')
+        }
+        continue
+      }
+    }
+
+    if (!monaco) {
+      ElMessage.error('Monaco Editor 加载失败，请检查网络连接或联系管理员')
+      throw new Error('所有CDN源都无法加载Monaco Editor')
+    }
 
     // 创建编辑器实例
     monacoEditor = monaco.editor.create(monacoContainer.value, {

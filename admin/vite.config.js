@@ -56,5 +56,5 @@ export default defineConfig({
       'axios',
       '@element-plus/icons-vue'
     ]
-  }
+  },
 })

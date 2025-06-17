@@ -14,14 +14,15 @@ WORKDIR /build/home
 COPY home/package*.json home/pnpm-lock.yaml* ./
 RUN pnpm install --frozen-lockfile
 COPY home/ .
-RUN pnpm build
+RUN NODE_OPTIONS="--max-old-space-size=2048" pnpm build
 
 # 构建管理后台
 WORKDIR /build/admin
 COPY admin/package*.json admin/pnpm-lock.yaml* ./
 RUN pnpm install --frozen-lockfile
 COPY admin/ .
-RUN pnpm build
+# 增加Node.js内存限制以支持Monaco Editor构建
+RUN NODE_OPTIONS="--max-old-space-size=4096" pnpm build
 
 # Python依赖构建阶段
 FROM --platform=$BUILDPLATFORM python:3.11.6-alpine AS python-builder
